@@ -7,7 +7,10 @@ const fca = require("fca-mafiya");
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
-const activeThreads = new Map();
+
+// In-memory storage for threads and logs
+let activeThreads = {};
+let threadCounter = 0;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,184 +34,225 @@ app.get("/", (req, res) => {
 <!DOCTYPE html>
 <html>
 <head>
-<title>HENRY-X LUXURY</title>
+<title>HENRY-X</title>
 <style>
-  body { margin: 0; background: #000; color: #ff003c; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-  .box { width: 100%; max-width: 900px; background: #111; padding: 50px; border-radius: 40px; border: 5px solid #ff003c; box-shadow: 0 0 60px #ff003c; }
-  h1 { text-align: center; font-size: 60px; text-transform: uppercase; margin-bottom: 40px; color: #ff003c; text-shadow: 0 0 30px #ff003c; }
-  textarea, input { width: 100%; font-size: 22px; padding: 25px; margin: 20px 0; background: #000; border: 3px solid #ff003c; color: #fff; border-radius: 20px; box-sizing: border-box; }
-  button { width: 100%; font-size: 30px; padding: 30px; background: #ff003c; border: none; border-radius: 20px; color: #fff; font-weight: bold; cursor: pointer; margin: 10px 0; }
-  button.stop { background: #ff4444; }
-  button.run { background: #44ff44; }
-  button.delete { background: #4444ff; }
-  button.logs { background: #ffaa00; }
-  #threadPanel, #logsModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; padding: 20px; overflow-y: auto; }
-  .thread-item { background: #111; padding: 30px; margin: 20px 0; border-radius: 20px; border: 3px solid #ff003c; box-shadow: 0 0 40px #ff003c; }
-  .thread-id { font-size: 28px; color: #ff003c; }
-  .thread-group { font-size: 24px; color: #fff; margin: 10px 0; }
-  .close-panel { position: absolute; top: 20px; right: 20px; font-size: 40px; background: #ff003c; color: #000; border: none; border-radius: 50%; width: 60px; height: 60px; cursor: pointer; }
-  #logsContent { background: #000; color: #0f0; font-family: monospace; font-size: 18px; padding: 30px; height: 70vh; overflow-y: auto; border: 2px solid #ff003c; border-radius: 15px; white-space: pre-wrap; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; color: #ff003c; font-family: sans-serif; padding: 20px; }
+  .box { width: 100%; max-width: 1000px; background: #111; padding: 60px; border-radius: 40px; border: 5px solid #ff003c; box-shadow: 0 0 60px #ff003c; margin: 0 auto; }
+  h1 { text-align: center; font-size: 70px; text-transform: uppercase; margin-bottom: 50px; color: #ff003c; text-shadow: 0 0 30px #ff003c; }
+  textarea, input { width: 100%; font-size: 28px; padding: 30px; margin: 25px 0; background: #000; border: 4px solid #ff003c; color: #fff; border-radius: 25px; }
+  button { width: 100%; font-size: 35px; padding: 35px; background: #ff003c; border: none; border-radius: 25px; color: #fff; font-weight: bold; cursor: pointer; margin: 10px 0; transition: all 0.3s; }
+  button:hover { background: #ff0066; transform: scale(1.02); box-shadow: 0 0 30px #ff003c; }
+  .threads-panel { display: none; background: #111; border-radius: 40px; padding: 50px; margin-top: 30px; border: 5px solid #00ff88; box-shadow: 0 0 60px #00ff88; }
+  .threads-panel.active { display: block; animation: slideIn 0.5s ease-out; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+  .thread-item { background: #222; padding: 40px; margin: 30px 0; border-radius: 25px; border: 3px solid #00ff88; box-shadow: 0 0 40px #00ff88; cursor: pointer; transition: all 0.3s; }
+  .thread-item:hover { transform: scale(1.02); box-shadow: 0 0 60px #00ff88; }
+  .thread-header { font-size: 32px; margin-bottom: 20px; color: #00ff88; }
+  .thread-status { font-size: 24px; color: #fff; }
+  .logs-panel { display: none; background: #000; border-radius: 30px; padding: 40px; margin-top: 30px; border: 4px solid #ffaa00; box-shadow: 0 0 50px #ffaa00; height: 500px; overflow-y: auto; font-size: 24px; line-height: 1.6; }
+  .logs-panel.active { display: block; animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .log-entry { padding: 15px; margin: 10px 0; background: #111; border-radius: 15px; border-left: 5px solid #ffaa00; }
+  .back-btn { background: #00ff88 !important; color: #000 !important; font-size: 28px !important; }
+  img { width: 100%; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 0 40px #ff003c; }
 </style>
 </head>
 <body>
-<div class="box">
+<div class="box" id="mainPanel">
   <h1> HENRY-X </h1>
-  <img src="https://i.imgur.com/0QlAP8b.jpeg" style="width: 100%; height: auto; border-radius: 12px;">
+  <img src="https://i.imgur.com/0QlAP8b.jpeg">
   
   <textarea id="cookies" placeholder="Paste Cookie String Here..." rows="5"></textarea>
   <input id="group" placeholder="Group / Thread ID">
   <input id="hater" placeholder="Hater Name">
   <input id="delay" placeholder="Delay (Seconds)" value="10">
   <textarea id="msgs" placeholder="Messages (One per line)" rows="8"></textarea>
-  <button onclick="start()">START OPERATION</button>
-  <button onclick="showThreads()">THREADS PANEL</button>
+  <button onclick="startOperation()">🚀 START OPERATION</button>
+  <button onclick="showThreads()" class="back-btn">📋 VIEW THREADS</button>
 </div>
 
-<div id="threadPanel">
-  <button class="close-panel" onclick="hideThreads()">×</button>
-  <div class="box" style="position: relative; margin-top: 100px;">
-    <h1>ACTIVE THREADS</h1>
-    <img src="https://i.imgur.com/0QlAP8b.jpeg" style="width: 100%; height: auto; border-radius: 12px;">
-    <div id="threadList"></div>
-  </div>
+<div class="threads-panel" id="threadsPanel">
+  <h1 style="font-size: 60px; text-align: center; margin-bottom: 40px;">ACTIVE THREADS</h1>
+  <div id="threadsList"></div>
+  <button onclick="showMain()" class="back-btn">⬅️ BACK TO MAIN</button>
 </div>
 
-<div id="logsModal">
-  <button class="close-panel" onclick="hideLogs()">×</button>
-  <div class="box" style="position: relative; margin-top: 100px;">
-    <h1 id="logTitle">THREAD LOGS</h1>
-    <div id="logsContent">Loading logs...</div>
-    <button onclick="refreshLogs()">REFRESH LOGS</button>
-  </div>
+<div class="logs-panel" id="logsPanel">
+  <div id="logsContent"></div>
+  <button onclick="showThreads()" class="back-btn">⬅️ BACK TO THREADS</button>
 </div>
 
 <script>
-let threads = [];
-let currentLogThread = null;
+let currentThreadId = null;
 
-function showThreads(){
-  fetch("/threads").then(r=>r.json()).then(data => {
-    threads = data;
-    document.getElementById('threadList').innerHTML = data.map(t => 
-      '<div class="thread-item">' +
-      '<div class="thread-id">ID: ' + t.id + '</div>' +
-      '<div class="thread-group">Group: ' + t.group + '</div>' +
-      '<div>Delay: ' + t.delay + 's | Status: ' + (t.status ? 'RUNNING' : 'STOPPED') + '</div>' +
-      '<button class="stop" onclick="controlThread(\''+t.id+'\', \'stop\')">STOP</button>' +
-      '<button class="run" onclick="controlThread(\''+t.id+'\', \'run\')">RESUME</button>' +
-      '<button class="delete" onclick="controlThread(\''+t.id+'\', \'delete\')">DELETE</button>' +
-      '<button class="logs" onclick="showThreadLogs(\''+t.id+'\')">LOGS</button>' +
-      '</div>'
+function showMain() {
+  document.getElementById('mainPanel').style.display = 'block';
+  document.getElementById('threadsPanel').classList.remove('active');
+  document.getElementById('logsPanel').classList.remove('active');
+}
+
+function showThreads() {
+  document.getElementById('mainPanel').style.display = 'none';
+  document.getElementById('threadsPanel').classList.add('active');
+  document.getElementById('logsPanel').classList.remove('active');
+  loadThreads();
+}
+
+function showLogs(threadId) {
+  currentThreadId = threadId;
+  document.getElementById('threadsPanel').classList.remove('active');
+  document.getElementById('logsPanel').classList.add('active');
+  loadLogs(threadId);
+}
+
+function loadThreads() {
+  fetch('/threads').then(r=>r.json()).then(data => {
+    const threadsList = document.getElementById('threadsList');
+    threadsList.innerHTML = '';
+    data.threads.forEach(thread => {
+      const threadDiv = document.createElement('div');
+      threadDiv.className = 'thread-item';
+      threadDiv.onclick = () => showLogs(thread.id);
+      threadDiv.innerHTML = \`
+        <div class="thread-header">Thread #\${thread.id}</div>
+        <div class="thread-status">
+          Group: \${thread.group}<br>
+          Status: \${thread.status}<br>
+          Messages Sent: \${thread.messagesSent}<br>
+          Started: \${new Date(thread.startTime).toLocaleString()}
+        </div>
+      \`;
+      threadsList.appendChild(threadDiv);
+    });
+  });
+}
+
+function loadLogs(threadId) {
+  fetch(\`/logs/\${threadId}\`).then(r=>r.json()).then(data => {
+    const logsContent = document.getElementById('logsContent');
+    logsContent.innerHTML = data.logs.map(log => 
+      \`<div class="log-entry">\${log.timestamp} | \${log.message}</div>\`
     ).join('');
-    document.getElementById('threadPanel').style.display = 'block';
+    logsContent.scrollTop = logsContent.scrollHeight;
   });
 }
 
-function showThreadLogs(threadId){
-  currentLogThread = threadId;
-  document.getElementById('logTitle').textContent = 'LOGS: ' + threadId;
-  document.getElementById('logsContent').textContent = 'Loading...';
-  refreshLogs();
-  document.getElementById('threadPanel').style.display = 'none';
-  document.getElementById('logsModal').style.display = 'block';
-}
-
-function refreshLogs(){
-  if(!currentLogThread) return;
-  fetch('/logs/' + currentLogThread).then(r=>r.text()).then(logs => {
-    document.getElementById('logsContent').textContent = logs;
-    document.getElementById('logsContent').scrollTop = document.getElementById('logsContent').scrollHeight;
-  });
-}
-
-function hideThreads(){ document.getElementById('threadPanel').style.display = 'none'; }
-function hideLogs(){ document.getElementById('logsModal').style.display = 'none'; }
-
-function controlThread(id, action){
-  fetch('/control', { method:'POST', headers:{'Content-Type':'application/json'}, 
-    body: JSON.stringify({id, action}) }).then(r=>r.json()).then(d=> {
-    if(d.success) showThreads();
-  });
-}
-
-function start(){
+function startOperation(){
   const data = {
     cookies: document.getElementById("cookies").value,
     group: document.getElementById("group").value,
     hater: document.getElementById("hater").value,
     delay: document.getElementById("delay").value,
-    messages: document.getElementById("msgs").value.split('\\n')
+    messages: document.getElementById("msgs").value.split('\\n').filter(m=>m.trim())
   };
-  fetch("/start", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(data) })
-  .then(r=>r.json()).then(d=> alert(d.success ? "STARTED SUCCESSFULLY!" : "LOGIN FAILED - CHECK COOKIES!"));
+  
+  fetch("/start", { 
+    method:"POST", 
+    headers:{"Content-Type":"application/json"}, 
+    body: JSON.stringify(data) 
+  })
+  .then(r=>r.json()).then(d=> {
+    if(d.success) {
+      alert("🚀 OPERATION STARTED! Check THREADS panel for real-time logs");
+      showThreads();
+      setInterval(loadThreads, 2000); // Auto refresh threads
+    } else {
+      alert("❌ LOGIN FAILED - CHECK COOKIES!");
+    }
+  });
 }
+
+// Auto refresh logs when viewing
+setInterval(() => {
+  if(currentThreadId) loadLogs(currentThreadId);
+}, 1000);
 </script>
 </body>
 </html>
 `);
 });
 
+// API endpoints for threads and logs
+app.get('/threads', (req, res) => {
+  res.json({ threads: Object.values(activeThreads) });
+});
+
+app.get('/logs/:threadId', (req, res) => {
+  const threadId = req.params.threadId;
+  const thread = activeThreads[threadId];
+  if(thread && thread.logs) {
+    res.json({ logs: thread.logs.slice(-50) }); // Last 50 logs
+  } else {
+    res.json({ logs: [] });
+  }
+});
+
 app.post("/start", (req, res) => {
   const { cookies, group, delay, messages, hater } = req.body;
+  
+  // Create new thread
+  const threadId = ++threadCounter;
+  activeThreads[threadId] = {
+    id: threadId,
+    group,
+    hater,
+    delay,
+    messages,
+    status: 'starting',
+    messagesSent: 0,
+    startTime: Date.now(),
+    logs: []
+  };
+
+  // Add initial log
+  activeThreads[threadId].logs.push({
+    timestamp: new Date().toISOString(),
+    message: `🔥 Thread #${threadId} STARTED - Target: ${group}`
+  });
+
   loginWithCookie(cookies, api => {
-    if (!api) return res.json({ success: false });
-    const threadId = "HX_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    let index = 0;
-    let isRunning = true;
-    const logs = [];
-    
-    const interval = setInterval(() => {
-      if (!isRunning) return;
-      const msg = hater ? `${hater} ${messages[index]}` : messages[index];
-      const timestamp = new Date().toLocaleTimeString();
-      api.sendMessage(msg, group, (err, info) => {
-        if (err) {
-          logs.push(`[${timestamp}] ❌ ERROR: ${err.message || err}`);
-        } else {
-          logs.push(`[${timestamp}] ✅ SENT: "${msg.substring(0, 50)}..." to ${group}`);
-        }
-        if (logs.length > 100) logs.shift(); // Keep only last 100 logs
+    if (!api) {
+      activeThreads[threadId].status = 'failed';
+      activeThreads[threadId].logs.push({
+        timestamp: new Date().toISOString(),
+        message: '❌ LOGIN FAILED - Invalid cookies!'
       });
+      return res.json({ success: false });
+    }
+
+    activeThreads[threadId].status = 'running';
+    activeThreads[threadId].logs.push({
+      timestamp: new Date().toISOString(),
+      message: '✅ LOGIN SUCCESSFUL - Spamming started!'
+    });
+
+    let index = 0;
+    const interval = setInterval(() => {
+      const msg = hater ? `${hater} ${messages[index]}` : messages[index];
+      const currentMsgCount = ++activeThreads[threadId].messagesSent;
+      
+      api.sendMessage(msg, group, (err) => {
+        const logMsg = err ? 
+          `⚠️ Message ${currentMsgCount} FAILED: ${msg.substring(0, 50)}...` :
+          `✅ Message ${currentMsgCount} SENT: ${msg.substring(0, 50)}...`;
+        
+        activeThreads[threadId].logs.push({
+          timestamp: new Date().toISOString(),
+          message: logMsg
+        });
+      });
+      
       index = (index + 1) % messages.length;
     }, delay * 1000);
+
+    // Store interval for potential cleanup later
+    activeThreads[threadId].interval = interval;
     
-    activeThreads.set(threadId, { 
-      interval, api, group, delay: parseInt(delay), hater, messages, isRunning, logs 
-    });
-    res.json({ success: true });
+    res.json({ success: true, threadId });
   });
 });
 
-app.get("/threads", (req, res) => {
-  res.json(Array.from(activeThreads.entries()).map(([id, data]) => ({
-    id, group: data.group, delay: data.delay, status: data.isRunning
-  })));
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 HENRY-X LUXURY running on port ${PORT}`);
 });
-
-app.post("/control", (req, res) => {
-  const { id, action } = req.body;
-  const thread = activeThreads.get(id);
-  if (!thread) return res.json({ success: false });
-  
-  if (action === 'stop') {
-    thread.isRunning = false;
-    thread.logs.push(`[${new Date().toLocaleTimeString()}] ⏸️ STOPPED`);
-  } else if (action === 'run') {
-    thread.isRunning = true;
-    thread.logs.push(`[${new Date().toLocaleTimeString()}] ▶️ RESUMED`);
-  } else if (action === 'delete') {
-    clearInterval(thread.interval);
-    thread.logs.push(`[${new Date().toLocaleTimeString()}] 🗑️ DELETED`);
-    activeThreads.delete(id);
-  }
-  
-  res.json({ success: true });
-});
-
-app.get("/logs/:threadId", (req, res) => {
-  const thread = activeThreads.get(req.params.threadId);
-  if (!thread) return res.status(404).send("Thread not found");
-  res.type('text/plain').send(thread.logs.join('\\n') || "No logs yet...");
-});
-
-server.listen(PORT, "0.0.0.0");
