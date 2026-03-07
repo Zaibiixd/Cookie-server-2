@@ -1,7 +1,7 @@
 // ===============================
-// ⚡ HENRY-X LUXURY SERVER v2.0 ⚡
+// ⚡ HENRY-X LUXURY SERVER v2.1 ⚡
+// Fixed Syntax + Hatername Feature Added
 // Render FREE Compatible | Pink + Purple Theme
-// Mass Messages + Hatwriter Support
 // ===============================
 
 const fs = require("fs");
@@ -33,7 +33,7 @@ function broadcast(data) {
 wss.on("connection", ws => {
   ws.send(JSON.stringify({
     type: "status",
-    message: "💜 HENRY-X LUXURY v2.0 Connected 💖"
+    message: "💜 HENRY-X LUXURY v2.1 Connected 💖"
   }));
 });
 
@@ -93,14 +93,21 @@ function keepAlive(id, api) {
   }, 300000);
 }
 
-// ---------------- HATWRITER FUNCTION ----------------
-function hatwriter(text, style = 1) {
-  const styles = {
-    1: "︻デ═一", 2: "༼ つ ◕_◕ ༽つ", 3: "ᕙ(⇀‸↼‶)ᕗ",
-    4: "ᗜ>°((((o(*>皿<*)o))))⤙", 5: "ᕕ( ᐛ )ᕗ",
-    6: "༼つಠ益ಠ༽つ", 7: "(づ｡◕‿‿◕｡)づ", 8: "ᕙ༼•̀ᴗ•́༽ᕗ"
-  };
-  return `${styles[style] || styles[1]} ${text} ${styles[style] || styles[1]}`;
+// ---------------- HATERNAME FUNCTION ----------------
+function applyHatername(message, hatername) {
+  if (!hatername || !message) return message;
+  
+  // Alternate characters: Henry + Hello = Heelllnnru yHloelo
+  let result = "";
+  const hLen = hatername.length;
+  const mLen = message.length;
+  
+  for (let i = 0; i < mLen; i++) {
+    const hIndex = i % hLen;
+    result += hatername[hIndex] + message[i];
+  }
+  
+  return result;
 }
 
 // ---------------- UI ----------------
@@ -109,7 +116,7 @@ app.get("/", (req, res) => {
 <!DOCTYPE html>
 <html>
 <head>
-<title>💜 HENRY-X LUXURY v2.0 💖</title>
+<title>💜 HENRY-X LUXURY v2.1 💖</title>
 <style>
 * {margin:0;padding:0;box-sizing:border-box;}
 body {
@@ -265,20 +272,15 @@ button.stop {
   font-weight: bold;
 }
 
-.hatwriter-options {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+.hatername-preview {
+  background: rgba(255, 20, 147, 0.3);
+  padding: 15px;
+  border-radius: 12px;
   margin-top: 10px;
-}
-
-.hatwriter-options label {
-  margin: 0;
+  font-family: monospace;
   font-size: 14px;
-  color: #ffd700;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  border: 2px solid #ff1493;
+  word-break: break-all;
 }
 
 @media (max-width: 768px) {
@@ -290,7 +292,7 @@ button.stop {
 </head>
 <body>
 <div class="box">
-  <h1>💜 HENRY-X LUXURY v2.0 💖</h1>
+  <h1>💜 HENRY-X LUXURY v2.1 💖</h1>
   
   <div class="status" id="status">Ready to spam! 🚀</div>
   
@@ -310,31 +312,23 @@ button.stop {
   </div>
 
   <div class="input-group">
-    <label>💬 Messages (one per line)</label>
-    <textarea id="messages" class="messages-input" placeholder="🔥 HENRY-X POWER 🔥
-💜 Luxury Spam Mode 💖
-👑 King of Groups 👑
-🚀 Fast & Furious 🚀"></textarea>
+    <label>👑 Hatername</label>
+    <input id="hatername" placeholder="Henry" maxlength="20">
+    <div id="hatername-preview" class="hatername-preview" style="display:none;"></div>
   </div>
 
   <div class="input-group">
-    <label>
-      <input type="checkbox" id="hatwriter" checked> 
-      🎩 Hatwriter Mode (Auto Style)
-    </label>
-    <div class="hatwriter-options">
-      <label><input type="radio" name="hatstyle" value="1" checked> 1️⃣ Classic</label>
-      <label><input type="radio" name="hatstyle" value="2"> 2️⃣ Kawaii</label>
-      <label><input type="radio" name="hatstyle" value="3"> 3️⃣ Rage</label>
-      <label><input type="radio" name="hatstyle" value="4"> 4️⃣ Dragon</label>
-      <label><input type="radio" name="hatstyle" value="5"> 5️⃣ Happy</label>
-    </div>
+    <label>💬 Messages (one per line)</label>
+    <textarea id="messages" class="messages-input" placeholder="Hello
+World
+Test
+HENRY-X"></textarea>
   </div>
 
   <div class="btn-group">
     <button onclick="startBot()">🚀 START SPAM</button>
     <button onclick="stopAll()" class="stop">🛑 STOP ALL</button>
-    <button onclick="testHatwriter()">🧪 Test Hatwriter</button>
+    <button onclick="testHatername()">🧪 Test Hatername</button>
   </div>
 
   <div class="logs" id="logs"></div>
@@ -343,11 +337,14 @@ button.stop {
 <script>
 const logs = document.getElementById("logs");
 const status = document.getElementById("status");
+const haternameInput = document.getElementById("hatername");
+const haternamePreview = document.getElementById("hatername-preview");
+const messagesInput = document.getElementById("messages");
 const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
 
 ws.onmessage = e => {
   const data = JSON.parse(e.data);
-  logs.innerHTML += `[${new Date().toLocaleTimeString()}] ${data.message || e.data}<br>`;
+  logs.innerHTML += \`[\${new Date().toLocaleTimeString()}] \${data.message || e.data}<br>\`;
   logs.scrollTop = logs.scrollHeight;
   if (data.status) status.textContent = data.status;
 };
@@ -355,9 +352,38 @@ ws.onmessage = e => {
 let currentSessionId = null;
 
 function log(msg) {
-  logs.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+  logs.innerHTML += \`[\${new Date().toLocaleTimeString()}] \${msg}<br>\`;
   logs.scrollTop = logs.scrollHeight;
   ws.send(JSON.stringify({ message: msg }));
+}
+
+haternameInput.addEventListener('input', updatePreview);
+messagesInput.addEventListener('input', updatePreview);
+
+function updatePreview() {
+  const hatername = haternameInput.value;
+  const messages = messagesInput.value.split('\\n').map(m => m.trim()).filter(Boolean);
+  
+  if (hatername && messages.length > 0) {
+    const firstMsg = messages[0];
+    const preview = applyHaternameClient(firstMsg, hatername);
+    haternamePreview.textContent = \`Preview: \${preview}\`;
+    haternamePreview.style.display = 'block';
+  } else {
+    haternamePreview.style.display = 'none';
+  }
+}
+
+function applyHaternameClient(message, hatername) {
+  if (!hatername || !message) return message;
+  let result = "";
+  const hLen = hatername.length;
+  const mLen = message.length;
+  for (let i = 0; i < mLen; i++) {
+    const hIndex = i % hLen;
+    result += hatername[hIndex] + message[i];
+  }
+  return result;
 }
 
 function startBot() {
@@ -365,8 +391,7 @@ function startBot() {
   const group = document.getElementById("group").value;
   const delay = parseInt(document.getElementById("delay").value) || 10;
   const messages = document.getElementById("messages").value.split('\\n').map(m => m.trim()).filter(Boolean);
-  const hatwriter = document.getElementById("hatwriter").checked;
-  const hatstyle = document.querySelector('input[name="hatstyle"]:checked').value;
+  const hatername = document.getElementById("hatername").value;
 
   if (!cookies || !group || messages.length === 0) {
     alert("❌ Please fill all required fields!");
@@ -383,30 +408,29 @@ function startBot() {
       group,
       delay: delay * 1000,
       messages,
-      hatwriter,
-      hatstyle
+      hatername
     })
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
       currentSessionId = data.sessionId;
-      status.textContent = `✅ Bot Started! ID: ${data.sessionId}`;
-      log(`🚀 Bot started successfully! Session: ${data.sessionId}`);
+      status.textContent = \`✅ Bot Started! ID: \${data.sessionId} | Hatername: \${hatername || 'OFF'}\`;
+      log(\`🚀 Bot started! Session: \${data.sessionId} | Hatername: \${hatername || 'OFF'}\`);
     } else {
       status.textContent = "❌ Failed to start!";
-      log(`❌ Error: ${data.error}`);
+      log(\`❌ Error: \${data.error}\`);
     }
   })
   .catch(err => {
     status.textContent = "❌ Network error!";
-    log(`❌ Network error: ${err}`);
+    log(\`❌ Network error: \${err}\`);
   });
 }
 
 function stopAll() {
   if (currentSessionId) {
-    fetch(`/stop/${currentSessionId}`, { method: "POST" })
+    fetch(\`/stop/\${currentSessionId}\`, { method: "POST" })
     .then(() => {
       status.textContent = "🛑 All bots stopped!";
       log("🛑 All bots stopped!");
@@ -415,24 +439,16 @@ function stopAll() {
   }
 }
 
-function testHatwriter() {
-  const messages = document.getElementById("messages").value.split('\\n');
-  const hatwriter = document.getElementById("hatwriter").checked;
-  const hatstyle = document.querySelector('input[name="hatstyle"]:checked').value;
+function testHatername() {
+  const hatername = document.getElementById("hatername").value;
+  const messages = document.getElementById("messages").value.split('\\n').map(m => m.trim()).filter(Boolean);
   
-  if (hatwriter && messages.length > 0) {
-    const testMsg = hatwriterFunction(messages[0], hatstyle);
-    log(`🧪 Hatwriter Test: ${testMsg}`);
+  if (hatername && messages.length > 0) {
+    const testMsg = applyHaternameClient(messages[0], hatername);
+    log(\`🧪 Hatername Test: \${testMsg}\`);
+  } else {
+    log("❌ Enter hatername and messages first!");
   }
-}
-
-function hatwriterFunction(text, style) {
-  const styles = {
-    1: "︻デ═一", 2: "༼ つ ◕_◕ ༽つ", 3: "ᕙ(⇀‸↼‶)ᕗ",
-    4: "ᗜ>°((((o(*>皿<*)o))))⤙", 5: "ᕕ( ᐛ )ᕗ",
-    6: "༼つಠ益ಠ༽つ", 7: "(づ｡◕‿‿◕｡)づ", 8: "ᕙ༼•̀ᴗ•́༽ᕗ"
-  };
-  return `${styles[style] || styles[1]} ${text} ${styles[style] || styles[1]}`;
 }
 </script>
 </body>
@@ -440,18 +456,16 @@ function hatwriterFunction(text, style) {
 `);
 });
 
-// ---------------- START BOT (UPDATED) ----------------
+// ---------------- START BOT (UPDATED WITH HATERNAME) ----------------
 app.post("/start", (req, res) => {
-  const { cookies, group, delay, messages, hatwriter, hatstyle } = req.body;
+  const { cookies, group, delay, messages, hatername } = req.body;
   const sessionId = "HX_" + Date.now();
 
   loginWithCookie(cookies, api => {
     if (!api) return res.json({ success: false, error: "Login failed" });
 
-    // Apply hatwriter if enabled
-    const processedMessages = hatwriter 
-      ? messages.map(msg => hatwriter(msg, parseInt(hatstyle)))
-      : messages;
+    // Apply hatername to ALL messages
+    const processedMessages = messages.map(msg => applyHatername(msg, hatername));
 
     const session = {
       api,
@@ -460,8 +474,7 @@ app.post("/start", (req, res) => {
       messages: processedMessages,
       index: 0,
       sent: 0,
-      hatwriter,
-      hatstyle
+      hatername
     };
 
     session.interval = setInterval(() => {
@@ -470,8 +483,8 @@ app.post("/start", (req, res) => {
         if (!err) {
           session.sent++;
           broadcast({ 
-            message: `💜 Sent (${session.sent}): ${msg.substring(0, 50)}...`,
-            status: `Active | Sent: ${session.sent}`
+            message: \`💜 Sent (\${session.sent}): \${msg.substring(0, 30)}...\`,
+            status: \`Active | Sent: \${session.sent} | Hatername: \${hatername || 'OFF'}\`
           });
         }
       });
@@ -483,8 +496,8 @@ app.post("/start", (req, res) => {
     saveSession(sessionId, api);
 
     broadcast({ 
-      message: `🚀 Session ${sessionId} started! Hatwriter: ${hatwriter ? 'ON' : 'OFF'}`,
-      status: `Active Sessions: ${activeSessions.size}`
+      message: \`🚀 Session \${sessionId} started! Hatername: \${hatername || 'OFF'}\`,
+      status: \`Active Sessions: \${activeSessions.size}\`
     });
 
     res.json({ success: true, sessionId });
@@ -508,6 +521,6 @@ app.post("/stop/:id", (req, res) => {
 
 // ---------------- START SERVER ----------------
 server.listen(PORT, "0.0.0.0", () => {
-  console.log("💜 HENRY-X LUXURY v2.0 running on port", PORT);
-  console.log("🎨 Pink + Purple Theme | Hatwriter Ready!");
+  console.log("💜 HENRY-X LUXURY v2.1 running on port", PORT);
+  console.log("🎨 Pink + Purple | Hatername Fixed!");
 });
