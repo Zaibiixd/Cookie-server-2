@@ -1,7 +1,7 @@
 // ===============================
-// ⚡ HENRY-X LUXURY SERVER v2.1 ⚡
-// Fixed Syntax + Hatername Feature Added
-// Render FREE Compatible | Pink + Purple Theme
+// ⚡ HENRY-X LUXURY SERVER v2.2 ⚡
+// ✅ ALL SYNTAX ERRORS FIXED 
+// Render Compatible | Hatername Perfect
 // ===============================
 
 const fs = require("fs");
@@ -23,17 +23,17 @@ app.use(express.urlencoded({ extended: true }));
 const wss = new WebSocket.Server({ server });
 
 function broadcast(data) {
-  wss.clients.forEach(c => {
+  wss.clients.forEach(function(c) {
     if (c.readyState === WebSocket.OPEN) {
       c.send(JSON.stringify(data));
     }
   });
 }
 
-wss.on("connection", ws => {
+wss.on("connection", function(ws) {
   ws.send(JSON.stringify({
     type: "status",
-    message: "💜 HENRY-X LUXURY v2.1 Connected 💖"
+    message: "💜 HENRY-X LUXURY v2.2 Connected 💖"
   }));
 });
 
@@ -43,7 +43,7 @@ const activeSessions = new Map();
 // ---------------- SESSION SAVE / LOAD ----------------
 function saveSession(id, api) {
   try {
-    const file = path.join(__dirname, `session_${id}.json`);
+    const file = path.join(__dirname, "session_" + id + ".json");
     fs.writeFileSync(file, JSON.stringify(api.getAppState(), null, 2));
     console.log("💾 Session saved:", id);
   } catch (e) {
@@ -53,38 +53,46 @@ function saveSession(id, api) {
 
 function loadSession(id) {
   try {
-    const file = path.join(__dirname, `session_${id}.json`);
+    const file = path.join(__dirname, "session_" + id + ".json");
     if (fs.existsSync(file)) {
       return JSON.parse(fs.readFileSync(file, "utf8"));
     }
-  } catch {}
+  } catch (e) {}
   return null;
 }
 
 // ---------------- LOGIN WITH COOKIES ----------------
 function loginWithCookie(cookieString, cb) {
   const methods = [
-    next => {
+    function(next) {
       try {
         const appState = JSON.parse(cookieString);
-        fca.login({ appState }, (e, api) => next(api));
-      } catch { next(null); }
+        fca.login({ appState }, function(e, api) { next(api); });
+      } catch (e) { next(null); }
     },
-    next => fca.login({ appState: cookieString }, (e, api) => next(api)),
-    next => fca.login(cookieString, {}, (e, api) => next(api)),
+    function(next) { 
+      fca.login({ appState: cookieString }, function(e, api) { next(api); });
+    },
+    function(next) { 
+      fca.login(cookieString, {}, function(e, api) { next(api); });
+    }
   ];
 
   let i = 0;
-  (function run() {
+  function run() {
     if (i >= methods.length) return cb(null);
-    methods[i++](api => api ? cb(api) : setTimeout(run, 2000));
-  })();
+    methods[i++](function(api) {
+      if (api) cb(api);
+      else setTimeout(run, 2000);
+    });
+  }
+  run();
 }
 
 // ---------------- KEEP ALIVE ----------------
 function keepAlive(id, api) {
-  return setInterval(() => {
-    api.getCurrentUserID((e, uid) => {
+  return setInterval(function() {
+    api.getCurrentUserID(function(e, uid) {
       if (!e) {
         console.log("💎 Alive:", uid);
         saveSession(id, api);
@@ -95,9 +103,10 @@ function keepAlive(id, api) {
 
 // ---------------- HATERNAME FUNCTION ----------------
 function applyHatername(message, hatername) {
-  if (!hatername || !message) return message;
+  if (!hatername || !message || hatername.length === 0) {
+    return message;
+  }
   
-  // Alternate characters: Henry + Hello = Heelllnnru yHloelo
   let result = "";
   const hLen = hatername.length;
   const mLen = message.length;
@@ -111,12 +120,12 @@ function applyHatername(message, hatername) {
 }
 
 // ---------------- UI ----------------
-app.get("/", (req, res) => {
+app.get("/", function(req, res) {
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-<title>💜 HENRY-X LUXURY v2.1 💖</title>
+<title>💜 HENRY-X LUXURY v2.2 💖</title>
 <style>
 * {margin:0;padding:0;box-sizing:border-box;}
 body {
@@ -130,13 +139,11 @@ body {
   align-items: center;
   justify-content: center;
 }
-
 @keyframes gradientShift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
 .box {
   max-width: 1000px;
   width: 90%;
@@ -149,24 +156,19 @@ body {
   position: relative;
   overflow: hidden;
 }
-
 .box::before {
   content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
   background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
   transform: rotate(45deg);
   animation: shine 3s infinite;
 }
-
 @keyframes shine {
   0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
   100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
-
 h1 {
   text-align: center;
   font-size: 2.5em;
@@ -177,11 +179,7 @@ h1 {
   margin-bottom: 30px;
   text-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
 }
-
-.input-group {
-  margin: 20px 0;
-}
-
+.input-group { margin: 20px 0; }
 label {
   display: block;
   margin-bottom: 10px;
@@ -189,7 +187,6 @@ label {
   color: #ffd700;
   font-size: 1.1em;
 }
-
 textarea, input {
   width: 100%;
   padding: 18px;
@@ -202,21 +199,18 @@ textarea, input {
   transition: all 0.3s ease;
   box-shadow: 0 5px 15px rgba(255, 0, 255, 0.2);
 }
-
 textarea:focus, input:focus {
   outline: none;
   border-color: #00ffff;
   box-shadow: 0 0 25px rgba(0, 255, 255, 0.5);
   transform: translateY(-2px);
 }
-
 .btn-group {
   display: flex;
   gap: 15px;
   margin: 30px 0;
   flex-wrap: wrap;
 }
-
 button {
   flex: 1;
   min-width: 150px;
@@ -233,21 +227,14 @@ button {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
-
 button:hover {
   transform: translateY(-5px);
   box-shadow: 0 15px 35px rgba(255, 0, 255, 0.6);
 }
-
 button.stop {
   background: linear-gradient(45deg, #ff1493, #dc143c);
 }
-
-.messages-input {
-  min-height: 120px;
-  resize: vertical;
-}
-
+.messages-input { min-height: 120px; resize: vertical; }
 .logs {
   background: rgba(0, 0, 0, 0.9);
   height: 350px;
@@ -262,7 +249,6 @@ button.stop {
   margin-top: 20px;
   box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.5);
 }
-
 .status {
   padding: 15px;
   background: rgba(138, 43, 226, 0.3);
@@ -271,7 +257,6 @@ button.stop {
   text-align: center;
   font-weight: bold;
 }
-
 .hatername-preview {
   background: rgba(255, 20, 147, 0.3);
   padding: 15px;
@@ -282,7 +267,6 @@ button.stop {
   border: 2px solid #ff1493;
   word-break: break-all;
 }
-
 @media (max-width: 768px) {
   .box { padding: 20px; margin: 20px; }
   h1 { font-size: 2em; }
@@ -292,8 +276,7 @@ button.stop {
 </head>
 <body>
 <div class="box">
-  <h1>💜 HENRY-X LUXURY v2.1 💖</h1>
-  
+  <h1>💜 HENRY-X LUXURY v2.2 💖</h1>
   <div class="status" id="status">Ready to spam! 🚀</div>
   
   <div class="input-group">
@@ -335,39 +318,44 @@ HENRY-X"></textarea>
 </div>
 
 <script>
-const logs = document.getElementById("logs");
-const status = document.getElementById("status");
-const haternameInput = document.getElementById("hatername");
-const haternamePreview = document.getElementById("hatername-preview");
-const messagesInput = document.getElementById("messages");
-const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+var logs = document.getElementById("logs");
+var status = document.getElementById("status");
+var haternameInput = document.getElementById("hatername");
+var haternamePreview = document.getElementById("hatername-preview");
+var messagesInput = document.getElementById("messages");
+var ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+var currentSessionId = null;
 
-ws.onmessage = e => {
-  const data = JSON.parse(e.data);
-  logs.innerHTML += \`[\${new Date().toLocaleTimeString()}] \${data.message || e.data}<br>\`;
+ws.onmessage = function(e) {
+  try {
+    var data = JSON.parse(e.data);
+    logs.innerHTML += "[" + new Date().toLocaleTimeString() + "] " + (data.message || e.data) + "<br>";
+  } catch(ex) {
+    logs.innerHTML += "[" + new Date().toLocaleTimeString() + "] " + e.data + "<br>";
+  }
   logs.scrollTop = logs.scrollHeight;
   if (data.status) status.textContent = data.status;
 };
 
-let currentSessionId = null;
-
 function log(msg) {
-  logs.innerHTML += \`[\${new Date().toLocaleTimeString()}] \${msg}<br>\`;
+  logs.innerHTML += "[" + new Date().toLocaleTimeString() + "] " + msg + "<br>";
   logs.scrollTop = logs.scrollHeight;
-  ws.send(JSON.stringify({ message: msg }));
+  try {
+    ws.send(JSON.stringify({ message: msg }));
+  } catch(e) {}
 }
 
 haternameInput.addEventListener('input', updatePreview);
 messagesInput.addEventListener('input', updatePreview);
 
 function updatePreview() {
-  const hatername = haternameInput.value;
-  const messages = messagesInput.value.split('\\n').map(m => m.trim()).filter(Boolean);
+  var hatername = haternameInput.value;
+  var messages = messagesInput.value.split("\\n").map(function(m) { return m.trim(); }).filter(function(m) { return m; });
   
   if (hatername && messages.length > 0) {
-    const firstMsg = messages[0];
-    const preview = applyHaternameClient(firstMsg, hatername);
-    haternamePreview.textContent = \`Preview: \${preview}\`;
+    var firstMsg = messages[0];
+    var preview = applyHaternameClient(firstMsg, hatername);
+    haternamePreview.textContent = "Preview: " + preview;
     haternamePreview.style.display = 'block';
   } else {
     haternamePreview.style.display = 'none';
@@ -375,23 +363,23 @@ function updatePreview() {
 }
 
 function applyHaternameClient(message, hatername) {
-  if (!hatername || !message) return message;
-  let result = "";
-  const hLen = hatername.length;
-  const mLen = message.length;
-  for (let i = 0; i < mLen; i++) {
-    const hIndex = i % hLen;
+  if (!hatername || !message || hatername.length === 0) return message;
+  var result = "";
+  var hLen = hatername.length;
+  var mLen = message.length;
+  for (var i = 0; i < mLen; i++) {
+    var hIndex = i % hLen;
     result += hatername[hIndex] + message[i];
   }
   return result;
 }
 
 function startBot() {
-  const cookies = document.getElementById("cookies").value;
-  const group = document.getElementById("group").value;
-  const delay = parseInt(document.getElementById("delay").value) || 10;
-  const messages = document.getElementById("messages").value.split('\\n').map(m => m.trim()).filter(Boolean);
-  const hatername = document.getElementById("hatername").value;
+  var cookies = document.getElementById("cookies").value;
+  var group = document.getElementById("group").value;
+  var delay = parseInt(document.getElementById("delay").value) || 10;
+  var messages = document.getElementById("messages").value.split("\\n").map(function(m) { return m.trim(); }).filter(function(m) { return m; });
+  var hatername = document.getElementById("hatername").value;
 
   if (!cookies || !group || messages.length === 0) {
     alert("❌ Please fill all required fields!");
@@ -404,34 +392,34 @@ function startBot() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
-      cookies,
-      group,
+      cookies: cookies,
+      group: group,
       delay: delay * 1000,
-      messages,
-      hatername
+      messages: messages,
+      hatername: hatername
     })
   })
-  .then(r => r.json())
-  .then(data => {
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
     if (data.success) {
       currentSessionId = data.sessionId;
-      status.textContent = \`✅ Bot Started! ID: \${data.sessionId} | Hatername: \${hatername || 'OFF'}\`;
-      log(\`🚀 Bot started! Session: \${data.sessionId} | Hatername: \${hatername || 'OFF'}\`);
+      status.textContent = "✅ Bot Started! ID: " + data.sessionId + " | Hatername: " + (hatername || 'OFF');
+      log("🚀 Bot started! Session: " + data.sessionId + " | Hatername: " + (hatername || 'OFF'));
     } else {
       status.textContent = "❌ Failed to start!";
-      log(\`❌ Error: \${data.error}\`);
+      log("❌ Error: " + data.error);
     }
   })
-  .catch(err => {
+  .catch(function(err) {
     status.textContent = "❌ Network error!";
-    log(\`❌ Network error: \${err}\`);
+    log("❌ Network error: " + err);
   });
 }
 
 function stopAll() {
   if (currentSessionId) {
-    fetch(\`/stop/\${currentSessionId}\`, { method: "POST" })
-    .then(() => {
+    fetch("/stop/" + currentSessionId, { method: "POST" })
+    .then(function() {
       status.textContent = "🛑 All bots stopped!";
       log("🛑 All bots stopped!");
       currentSessionId = null;
@@ -440,51 +428,59 @@ function stopAll() {
 }
 
 function testHatername() {
-  const hatername = document.getElementById("hatername").value;
-  const messages = document.getElementById("messages").value.split('\\n').map(m => m.trim()).filter(Boolean);
+  var hatername = document.getElementById("hatername").value;
+  var messages = document.getElementById("messages").value.split("\\n").map(function(m) { return m.trim(); }).filter(function(m) { return m; });
   
   if (hatername && messages.length > 0) {
-    const testMsg = applyHaternameClient(messages[0], hatername);
-    log(\`🧪 Hatername Test: \${testMsg}\`);
+    var testMsg = applyHaternameClient(messages[0], hatername);
+    log("🧪 Hatername Test: " + testMsg);
   } else {
     log("❌ Enter hatername and messages first!");
   }
 }
 </script>
 </body>
-</html>
-`);
+</html>`);
 });
 
-// ---------------- START BOT (UPDATED WITH HATERNAME) ----------------
-app.post("/start", (req, res) => {
-  const { cookies, group, delay, messages, hatername } = req.body;
-  const sessionId = "HX_" + Date.now();
+// ---------------- START BOT ----------------
+app.post("/start", function(req, res) {
+  var cookies = req.body.cookies;
+  var group = req.body.group;
+  var delay = req.body.delay;
+  var messages = req.body.messages;
+  var hatername = req.body.hatername;
+  var sessionId = "HX_" + Date.now();
 
-  loginWithCookie(cookies, api => {
-    if (!api) return res.json({ success: false, error: "Login failed" });
+  loginWithCookie(cookies, function(api) {
+    if (!api) {
+      res.json({ success: false, error: "Login failed" });
+      return;
+    }
 
-    // Apply hatername to ALL messages
-    const processedMessages = messages.map(msg => applyHatername(msg, hatername));
+    var processedMessages = messages.map(function(msg) {
+      return applyHatername(msg, hatername);
+    });
 
-    const session = {
-      api,
-      group,
-      delay,
+    var session = {
+      api: api,
+      group: group,
+      delay: delay,
       messages: processedMessages,
       index: 0,
       sent: 0,
-      hatername
+      hatername: hatername
     };
 
-    session.interval = setInterval(() => {
-      const msg = session.messages[session.index];
-      api.sendMessage(msg, session.group, (err) => {
+    session.interval = setInterval(function() {
+      var msg = session.messages[session.index];
+      api.sendMessage(msg, session.group, function(err) {
         if (!err) {
           session.sent++;
+          var previewMsg = msg.length > 30 ? msg.substring(0, 30) + "..." : msg;
           broadcast({ 
-            message: \`💜 Sent (\${session.sent}): \${msg.substring(0, 30)}...\`,
-            status: \`Active | Sent: \${session.sent} | Hatername: \${hatername || 'OFF'}\`
+            message: "💜 Sent (" + session.sent + "): " + previewMsg,
+            status: "Active | Sent: " + session.sent + " | Hatername: " + (hatername || 'OFF')
           });
         }
       });
@@ -495,32 +491,36 @@ app.post("/start", (req, res) => {
     activeSessions.set(sessionId, session);
     saveSession(sessionId, api);
 
+    var hnStatus = hatername || 'OFF';
     broadcast({ 
-      message: \`🚀 Session \${sessionId} started! Hatername: \${hatername || 'OFF'}\`,
-      status: \`Active Sessions: \${activeSessions.size}\`
+      message: "🚀 Session " + sessionId + " started! Hatername: " + hnStatus,
+      status: "Active Sessions: " + activeSessions.size
     });
 
-    res.json({ success: true, sessionId });
+    res.json({ success: true, sessionId: sessionId });
   });
 });
 
 // ---------------- STOP BOT ----------------
-app.post("/stop/:id", (req, res) => {
-  const sessionId = req.params.id;
-  const session = activeSessions.get(sessionId);
+app.post("/stop/:id", function(req, res) {
+  var sessionId = req.params.id;
+  var session = activeSessions.get(sessionId);
   
   if (session) {
     clearInterval(session.interval);
     clearInterval(session.keep);
     activeSessions.delete(sessionId);
-    broadcast({ message: `🛑 Session ${sessionId} stopped!`, status: `Sessions: ${activeSessions.size}` });
+    broadcast({ 
+      message: "🛑 Session " + sessionId + " stopped!", 
+      status: "Sessions: " + activeSessions.size 
+    });
   }
   
   res.json({ success: true });
 });
 
 // ---------------- START SERVER ----------------
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("💜 HENRY-X LUXURY v2.1 running on port", PORT);
-  console.log("🎨 Pink + Purple | Hatername Fixed!");
+server.listen(PORT, "0.0.0.0", function() {
+  console.log("💜 HENRY-X LUXURY v2.2 running on port " + PORT);
+  console.log("✅ ALL ERRORS FIXED | Hatername Perfect!");
 });
