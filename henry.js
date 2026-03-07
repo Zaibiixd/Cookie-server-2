@@ -1,27 +1,79 @@
+// ===============================
+// ⚡ HENRY-X LUXURY SERVER v2.0 ⚡
+// Render FREE Compatible | Pink + Purple Theme
+// Mass Messages + Hatwriter Support
+// ===============================
+
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const http = require("http");
+const WebSocket = require("ws");
 const fca = require("fca-mafiya");
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// ---------------- MIDDLEWARE ----------------
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const activeThreads = new Map();
-const logs = [];
+// ---------------- WEBSOCKET ----------------
+const wss = new WebSocket.Server({ server });
 
-// --- MULTI-METHOD E2EE COMPATIBLE LOGIN ---
+function broadcast(data) {
+  wss.clients.forEach(c => {
+    if (c.readyState === WebSocket.OPEN) {
+      c.send(JSON.stringify(data));
+    }
+  });
+}
+
+wss.on("connection", ws => {
+  ws.send(JSON.stringify({
+    type: "status",
+    message: "💜 HENRY-X LUXURY v2.0 Connected 💖"
+  }));
+});
+
+// ---------------- SESSION STORE ----------------
+const activeSessions = new Map();
+
+// ---------------- SESSION SAVE / LOAD ----------------
+function saveSession(id, api) {
+  try {
+    const file = path.join(__dirname, `session_${id}.json`);
+    fs.writeFileSync(file, JSON.stringify(api.getAppState(), null, 2));
+    console.log("💾 Session saved:", id);
+  } catch (e) {
+    console.log("❌ Save error:", e.message);
+  }
+}
+
+function loadSession(id) {
+  try {
+    const file = path.join(__dirname, `session_${id}.json`);
+    if (fs.existsSync(file)) {
+      return JSON.parse(fs.readFileSync(file, "utf8"));
+    }
+  } catch {}
+  return null;
+}
+
+// ---------------- LOGIN WITH COOKIES ----------------
 function loginWithCookie(cookieString, cb) {
-  const options = { listenEvents: true, selfListen: true, forceLogin: true };
   const methods = [
-    next => { try { const appState = JSON.parse(cookieString); fca.login({ appState }, options, (e, api) => next(api)); } catch { next(null); } },
-    next => { fca.login({ appState: cookieString }, options, (e, api) => next(api)); },
-    next => { fca.login(cookieString, options, (e, api) => next(api)); }
+    next => {
+      try {
+        const appState = JSON.parse(cookieString);
+        fca.login({ appState }, (e, api) => next(api));
+      } catch { next(null); }
+    },
+    next => fca.login({ appState: cookieString }, (e, api) => next(api)),
+    next => fca.login(cookieString, {}, (e, api) => next(api)),
   ];
+
   let i = 0;
   (function run() {
     if (i >= methods.length) return cb(null);
@@ -29,244 +81,358 @@ function loginWithCookie(cookieString, cb) {
   })();
 }
 
+// ---------------- KEEP ALIVE ----------------
+function keepAlive(id, api) {
+  return setInterval(() => {
+    api.getCurrentUserID((e, uid) => {
+      if (!e) {
+        console.log("💎 Alive:", uid);
+        saveSession(id, api);
+      }
+    });
+  }, 300000);
+}
+
+// ---------------- HATWRITER FUNCTION ----------------
+function hatwriter(text, style = 1) {
+  const styles = {
+    1: "︻デ═一", 2: "༼ つ ◕_◕ ༽つ", 3: "ᕙ(⇀‸↼‶)ᕗ",
+    4: "ᗜ>°((((o(*>皿<*)o))))⤙", 5: "ᕕ( ᐛ )ᕗ",
+    6: "༼つಠ益ಠ༽つ", 7: "(づ｡◕‿‿◕｡)づ", 8: "ᕙ༼•̀ᴗ•́༽ᕗ"
+  };
+  return `${styles[style] || styles[1]} ${text} ${styles[style] || styles[1]}`;
+}
+
+// ---------------- UI ----------------
 app.get("/", (req, res) => {
   res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-<title>HENRY-X LUXURY</title>
+<title>💜 HENRY-X LUXURY v2.0 💖</title>
 <style>
-  html, body { 
-    margin:0; 
-    font-family: 'Arial Black', sans-serif; 
-    color: #ff00ff; 
-    background: linear-gradient(45deg, #ff1493, #8a2be2, #ff69b4, #9932cc); 
-    background-size: 400% 400%;
-    animation: gradientShift 8s ease infinite;
-  }
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  .box { 
-    width: 90%; 
-    max-width: 900px; 
-    margin: 40px auto; 
-    background: linear-gradient(145deg, rgba(255,20,147,0.95), rgba(138,43,226,0.95)); 
-    padding: 50px; 
-    border-radius: 40px; 
-    border: 6px solid #ff00ff; 
-    box-shadow: 0 0 80px #ff00ff, inset 0 0 40px rgba(255,255,255,0.1); 
-    backdrop-filter: blur(10px);
-  }
-  h1 { 
-    text-align: center; 
-    font-size: 60px; 
-    text-transform: uppercase; 
-    margin-bottom: 40px; 
-    background: linear-gradient(45deg, #ff00ff, #ffff00, #00ffff); 
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-shadow: 0 0 40px #ff00ff;
-    animation: glow 2s ease-in-out infinite alternate;
-  }
-  @keyframes glow {
-    from { filter: drop-shadow(0 0 10px #ff00ff); }
-    to { filter: drop-shadow(0 0 30px #ff00ff); }
-  }
-  textarea, input { 
-    width: 100%; 
-    font-size: 24px; 
-    padding: 25px; 
-    margin: 15px 0; 
-    background: rgba(0,0,0,0.8); 
-    border: 4px solid #ff00ff; 
-    color: #fff; 
-    border-radius: 20px; 
-    box-sizing: border-box; 
-    transition: all 0.3s ease;
-    box-shadow: 0 0 20px rgba(255,0,255,0.3);
-  }
-  textarea:focus, input:focus {
-    outline: none;
-    border-color: #ffff00;
-    box-shadow: 0 0 30px #ff00ff;
-    transform: scale(1.02);
-  }
-  button { 
-    width: 100%; 
-    font-size: 30px; 
-    padding: 30px; 
-    margin-top: 20px; 
-    background: linear-gradient(45deg, #ff00ff, #8a2be2); 
-    border: none; 
-    border-radius: 20px; 
-    color: #fff; 
-    font-weight: 900; 
-    cursor: pointer; 
-    text-transform: uppercase;
-    transition: all 0.3s ease;
-    box-shadow: 0 10px 30px rgba(255,0,255,0.5);
-  }
-  button:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 40px rgba(255,0,255,0.8);
-  }
-  #threadModal, #logsModal { 
-    display: none; 
-    position: fixed; 
-    top: 0; 
-    left:0; 
-    width: 100%; 
-    height: 100%; 
-    background: rgba(0,0,0,0.95); 
-    padding: 50px; 
-    overflow-y: auto; 
-    z-index: 1000;
-  }
-  .status-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    margin: 20px 0;
-  }
-  .status-card {
-    background: linear-gradient(145deg, rgba(255,20,147,0.9), rgba(138,43,226,0.9));
-    padding: 25px;
-    border-radius: 20px;
-    border: 3px solid #ff00ff;
-    box-shadow: 0 0 30px rgba(255,0,255,0.5);
-  }
-  .log-entry {
-    background: rgba(0,0,0,0.7);
-    padding: 15px;
-    margin: 10px 0;
-    border-radius: 15px;
-    border-left: 5px solid #ff00ff;
-    font-family: monospace;
-  }
+* {margin:0;padding:0;box-sizing:border-box;}
+body {
+  background: linear-gradient(45deg, #ff00ff, #8a2be2, #ff1493, #9932cc);
+  background-size: 400% 400%;
+  animation: gradientShift 8s ease infinite;
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.box {
+  max-width: 1000px;
+  width: 90%;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-radius: 25px;
+  border: 2px solid rgba(255, 0, 255, 0.5);
+  box-shadow: 0 20px 40px rgba(255, 0, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.box::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+  transform: rotate(45deg);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+h1 {
+  text-align: center;
+  font-size: 2.5em;
+  background: linear-gradient(45deg, #ff00ff, #00ffff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 30px;
+  text-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+}
+
+.input-group {
+  margin: 20px 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #ffd700;
+  font-size: 1.1em;
+}
+
+textarea, input {
+  width: 100%;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #00ff88;
+  border: 2px solid #ff00ff;
+  border-radius: 15px;
+  font-size: 16px;
+  font-family: monospace;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(255, 0, 255, 0.2);
+}
+
+textarea:focus, input:focus {
+  outline: none;
+  border-color: #00ffff;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-group {
+  display: flex;
+  gap: 15px;
+  margin: 30px 0;
+  flex-wrap: wrap;
+}
+
+button {
+  flex: 1;
+  min-width: 150px;
+  padding: 18px 25px;
+  background: linear-gradient(45deg, #ff00ff, #8a2be2);
+  border: none;
+  border-radius: 15px;
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 25px rgba(255, 0, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+button:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(255, 0, 255, 0.6);
+}
+
+button.stop {
+  background: linear-gradient(45deg, #ff1493, #dc143c);
+}
+
+.messages-input {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.logs {
+  background: rgba(0, 0, 0, 0.9);
+  height: 350px;
+  overflow: auto;
+  color: #00ff88;
+  padding: 25px;
+  font-family: monospace;
+  font-size: 14px;
+  border-radius: 15px;
+  border: 2px solid #ff00ff;
+  line-height: 1.6;
+  margin-top: 20px;
+  box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.status {
+  padding: 15px;
+  background: rgba(138, 43, 226, 0.3);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.hatwriter-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.hatwriter-options label {
+  margin: 0;
+  font-size: 14px;
+  color: #ffd700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .box { padding: 20px; margin: 20px; }
+  h1 { font-size: 2em; }
+  .btn-group { flex-direction: column; }
+}
 </style>
 </head>
 <body>
 <div class="box">
-  <h1>⚡ HENRY-X LUXURY ⚡</h1>
+  <h1>💜 HENRY-X LUXURY v2.0 💖</h1>
   
-  <div class="status-grid" id="statusGrid">
-    <div class="status-card">
-      <h3>🔥 LIVE STATUS</h3>
-      <div id="liveStats">Active Tasks: 0 | Total Messages: 0</div>
-    </div>
-    <div class="status-card">
-      <h3>💜 SERVER STATUS</h3>
-      <div id="serverStats">Ready | Port: ${PORT}</div>
+  <div class="status" id="status">Ready to spam! 🚀</div>
+  
+  <div class="input-group">
+    <label>📋 Facebook Cookies</label>
+    <textarea id="cookies" placeholder="Paste your Facebook cookies/JSON here..."></textarea>
+  </div>
+
+  <div class="input-group">
+    <label>🎯 Group/Thread ID</label>
+    <input id="group" placeholder="Enter Group ID or Thread ID">
+  </div>
+
+  <div class="input-group">
+    <label>⏱️ Delay (seconds)</label>
+    <input id="delay" type="number" placeholder="10" value="10" min="1">
+  </div>
+
+  <div class="input-group">
+    <label>💬 Messages (one per line)</label>
+    <textarea id="messages" class="messages-input" placeholder="🔥 HENRY-X POWER 🔥
+💜 Luxury Spam Mode 💖
+👑 King of Groups 👑
+🚀 Fast & Furious 🚀"></textarea>
+  </div>
+
+  <div class="input-group">
+    <label>
+      <input type="checkbox" id="hatwriter" checked> 
+      🎩 Hatwriter Mode (Auto Style)
+    </label>
+    <div class="hatwriter-options">
+      <label><input type="radio" name="hatstyle" value="1" checked> 1️⃣ Classic</label>
+      <label><input type="radio" name="hatstyle" value="2"> 2️⃣ Kawaii</label>
+      <label><input type="radio" name="hatstyle" value="3"> 3️⃣ Rage</label>
+      <label><input type="radio" name="hatstyle" value="4"> 4️⃣ Dragon</label>
+      <label><input type="radio" name="hatstyle" value="5"> 5️⃣ Happy</label>
     </div>
   </div>
 
-  <textarea id="cookies" placeholder="PASTE COOKIES..."></textarea>
-  <input id="group" placeholder="GROUP / E2EE THREAD ID">
-  <input id="hater" placeholder="HATER NAME">
-  <input id="delay" placeholder="DELAY (seconds)" value="10">
-  <textarea id="msgs" placeholder="MESSAGES (ONE PER LINE)" rows="6"></textarea>
-  
-  <button onclick="start()">🚀 START OPERATION</button>
-  <button onclick="showThreads()" style="background: linear-gradient(45deg, #ff69b4, #9932cc);">📋 VIEW ACTIVE THREADS</button>
-  <button onclick="showLogs()" style="background: linear-gradient(45deg, #ff1493, #8a2be2);">📊 LIVE LOGS</button>
-  <button onclick="stopAll()" style="background: linear-gradient(45deg, #ff0000, #cc0000);">🛑 STOP ALL</button>
-</div>
+  <div class="btn-group">
+    <button onclick="startBot()">🚀 START SPAM</button>
+    <button onclick="stopAll()" class="stop">🛑 STOP ALL</button>
+    <button onclick="testHatwriter()">🧪 Test Hatwriter</button>
+  </div>
 
-<div id="threadModal">
-  <h1 style="color:#ff00ff">⚡ ACTIVE SESSIONS</h1>
-  <div id="threadList" style="color:#ff00ff; font-size:20px"></div>
-  <button onclick="document.getElementById('threadModal').style.display='none'" style="background:#550000;">CLOSE</button>
-</div>
-
-<div id="logsModal">
-  <h1 style="color:#ff00ff">📊 LIVE LOGS</h1>
-  <div id="logList"></div>
-  <button onclick="document.getElementById('logsModal').style.display='none'" style="background:#550000;">CLOSE</button>
+  <div class="logs" id="logs"></div>
 </div>
 
 <script>
-let totalMessages = 0;
-let activeCount = 0;
+const logs = document.getElementById("logs");
+const status = document.getElementById("status");
+const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
 
-function updateStats() {
-  fetch('/stats').then(r=>r.json()).then(data => {
-    document.getElementById('liveStats').innerHTML = 
-      `Active Tasks: ${data.active} | Total Messages: ${data.total} | Uptime: ${data.uptime}`;
-    document.getElementById('serverStats').innerHTML = 
-      `Running | Active: ${data.active} | Port: ${PORT}`;
-    activeCount = data.active;
-    totalMessages = data.total;
-  });
+ws.onmessage = e => {
+  const data = JSON.parse(e.data);
+  logs.innerHTML += `[${new Date().toLocaleTimeString()}] ${data.message || e.data}<br>`;
+  logs.scrollTop = logs.scrollHeight;
+  if (data.status) status.textContent = data.status;
+};
+
+let currentSessionId = null;
+
+function log(msg) {
+  logs.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+  logs.scrollTop = logs.scrollHeight;
+  ws.send(JSON.stringify({ message: msg }));
 }
 
-setInterval(updateStats, 2000);
-updateStats();
+function startBot() {
+  const cookies = document.getElementById("cookies").value;
+  const group = document.getElementById("group").value;
+  const delay = parseInt(document.getElementById("delay").value) || 10;
+  const messages = document.getElementById("messages").value.split('\\n').map(m => m.trim()).filter(Boolean);
+  const hatwriter = document.getElementById("hatwriter").checked;
+  const hatstyle = document.querySelector('input[name="hatstyle"]:checked').value;
 
-async function showThreads(){
-  const r = await fetch("/threads");
-  const data = await r.json();
-  document.getElementById('threadList').innerHTML = data.map(t => 
-    `<div class="status-card">
-      <p><strong>⚡ ID:</strong> ${t.id}</p>
-      <p><strong>🎯 Target:</strong> ${t.group}</p>
-      <p><strong>⏱️ Delay:</strong> ${t.delay}s</p>
-      <button onclick="stopThread('${t.id}')" style="background:#ff0000; font-size:16px; padding:10px;">STOP</button>
-    </div>`
-  ).join('') || '<p style="color:#ff69b4">No active threads...</p>';
-  document.getElementById('threadModal').style.display = 'block';
-}
-
-async function showLogs(){
-  const r = await fetch("/logs");
-  const data = await r.json();
-  document.getElementById('logList').innerHTML = data.map(log => 
-    `<div class="log-entry">${new Date(log.time).toLocaleTimeString()}: ${log.message}</div>`
-  ).join('');
-  document.getElementById('logsModal').style.display = 'block';
-}
-
-async function stopThread(threadId) {
-  await fetch("/stop", { 
-    method: "POST", 
-    headers: {"Content-Type": "application/json"}, 
-    body: JSON.stringify({threadId}) 
-  });
-  showThreads();
-}
-
-async function stopAll() {
-  await fetch("/stop-all", { method: "POST" });
-  alert("All operations stopped!");
-  showThreads();
-}
-
-async function start(){
-  const data = { 
-    cookies: cookies.value, 
-    group: group.value, 
-    hater: hater.value, 
-    delay: parseInt(delay.value) || 10, 
-    messages: msgs.value.split('\\n').filter(m=>m.trim()) 
-  };
-  try {
-    const r = await fetch("/start", { 
-      method:"POST", 
-      headers:{"Content-Type":"application/json"}, 
-      body: JSON.stringify(data) 
-    });
-    const result = await r.json();
-    if(result.success) {
-      alert("🚀 Started! ID: " + result.threadId);
-    } else {
-      alert("❌ Login failed! Check cookies.");
-    }
-  } catch(e) {
-    alert("❌ Error: " + e.message);
+  if (!cookies || !group || messages.length === 0) {
+    alert("❌ Please fill all required fields!");
+    return;
   }
+
+  status.textContent = "🔄 Starting bot...";
+  
+  fetch("/start", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      cookies,
+      group,
+      delay: delay * 1000,
+      messages,
+      hatwriter,
+      hatstyle
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      currentSessionId = data.sessionId;
+      status.textContent = `✅ Bot Started! ID: ${data.sessionId}`;
+      log(`🚀 Bot started successfully! Session: ${data.sessionId}`);
+    } else {
+      status.textContent = "❌ Failed to start!";
+      log(`❌ Error: ${data.error}`);
+    }
+  })
+  .catch(err => {
+    status.textContent = "❌ Network error!";
+    log(`❌ Network error: ${err}`);
+  });
+}
+
+function stopAll() {
+  if (currentSessionId) {
+    fetch(`/stop/${currentSessionId}`, { method: "POST" })
+    .then(() => {
+      status.textContent = "🛑 All bots stopped!";
+      log("🛑 All bots stopped!");
+      currentSessionId = null;
+    });
+  }
+}
+
+function testHatwriter() {
+  const messages = document.getElementById("messages").value.split('\\n');
+  const hatwriter = document.getElementById("hatwriter").checked;
+  const hatstyle = document.querySelector('input[name="hatstyle"]:checked').value;
+  
+  if (hatwriter && messages.length > 0) {
+    const testMsg = hatwriterFunction(messages[0], hatstyle);
+    log(`🧪 Hatwriter Test: ${testMsg}`);
+  }
+}
+
+function hatwriterFunction(text, style) {
+  const styles = {
+    1: "︻デ═一", 2: "༼ つ ◕_◕ ༽つ", 3: "ᕙ(⇀‸↼‶)ᕗ",
+    4: "ᗜ>°((((o(*>皿<*)o))))⤙", 5: "ᕕ( ᐛ )ᕗ",
+    6: "༼つಠ益ಠ༽つ", 7: "(づ｡◕‿‿◕｡)づ", 8: "ᕙ༼•̀ᴗ•́༽ᕗ"
+  };
+  return `${styles[style] || styles[1]} ${text} ${styles[style] || styles[1]}`;
 }
 </script>
 </body>
@@ -274,97 +440,74 @@ async function start(){
 `);
 });
 
-// Stats endpoint
-app.get("/stats", (req, res) => {
-  let totalMsg = 0;
-  activeThreads.forEach(data => totalMsg += (data.msgCount || 0));
-  res.json({
-    active: activeThreads.size,
-    total: totalMsg,
-    uptime: process.uptime().toFixed(0) + 's'
-  });
-});
-
-// Live logs endpoint
-app.get("/logs", (req, res) => {
-  res.json(logs.slice(-50)); // Last 50 logs
-});
-
+// ---------------- START BOT (UPDATED) ----------------
 app.post("/start", (req, res) => {
-  const { cookies, group, delay, messages, hater } = req.body;
-  
-  logs.push({ time: Date.now(), message: `🚀 Starting new operation for group: ${group}` });
-  
+  const { cookies, group, delay, messages, hatwriter, hatstyle } = req.body;
+  const sessionId = "HX_" + Date.now();
+
   loginWithCookie(cookies, api => {
-    if (!api) {
-      logs.push({ time: Date.now(), message: `❌ Login failed for group: ${group}` });
-      return res.json({ success: false });
-    }
-    
-    const threadId = "HX_" + Date.now();
-    let msgCount = 0;
-    
-    const interval = setInterval(() => {
-      const msg = hater ? `${hater} ${messages[Math.floor(Math.random() * messages.length)]}` : 
-                          messages[Math.floor(Math.random() * messages.length)];
-      
-      api.sendMessage({ body: msg }, group, (err, info) => {
-        if (err) {
-          logs.push({ time: Date.now(), message: `❌ Error in ${threadId}: ${err.message}` });
-          console.error("E2EE Send Error:", err);
-        } else {
-          msgCount++;
-          logs.push({ time: Date.now(), message: `✅ ${threadId} -> ${group}: ${msg.substring(0,50)}...` });
+    if (!api) return res.json({ success: false, error: "Login failed" });
+
+    // Apply hatwriter if enabled
+    const processedMessages = hatwriter 
+      ? messages.map(msg => hatwriter(msg, parseInt(hatstyle)))
+      : messages;
+
+    const session = {
+      api,
+      group,
+      delay,
+      messages: processedMessages,
+      index: 0,
+      sent: 0,
+      hatwriter,
+      hatstyle
+    };
+
+    session.interval = setInterval(() => {
+      const msg = session.messages[session.index];
+      api.sendMessage(msg, session.group, (err) => {
+        if (!err) {
+          session.sent++;
+          broadcast({ 
+            message: `💜 Sent (${session.sent}): ${msg.substring(0, 50)}...`,
+            status: `Active | Sent: ${session.sent}`
+          });
         }
       });
-    }, delay * 1000);
-    
-    activeThreads.set(threadId, { 
-      group, 
-      interval, 
-      delay,
-      msgCount: 0,
-      api,
-      hater 
+      session.index = (session.index + 1) % session.messages.length;
+    }, session.delay);
+
+    session.keep = keepAlive(sessionId, api);
+    activeSessions.set(sessionId, session);
+    saveSession(sessionId, api);
+
+    broadcast({ 
+      message: `🚀 Session ${sessionId} started! Hatwriter: ${hatwriter ? 'ON' : 'OFF'}`,
+      status: `Active Sessions: ${activeSessions.size}`
     });
-    
-    logs.push({ time: Date.now(), message: `⚡ ${threadId} started - Target: ${group} (Delay: ${delay}s)` });
-    res.json({ success: true, threadId });
+
+    res.json({ success: true, sessionId });
   });
 });
 
-app.get("/threads", (req, res) => {
-  const list = Array.from(activeThreads.entries()).map(([id, d]) => ({
-    id, 
-    group: d.group,
-    delay: d.delay
-  }));
-  res.json(list);
-});
-
-app.post("/stop", (req, res) => {
-  const { threadId } = req.body;
-  const thread = activeThreads.get(threadId);
-  if (thread) {
-    clearInterval(thread.interval);
-    thread.api.logout(() => {});
-    activeThreads.delete(threadId);
-    logs.push({ time: Date.now(), message: `🛑 Stopped ${threadId} - Target: ${thread.group}` });
+// ---------------- STOP BOT ----------------
+app.post("/stop/:id", (req, res) => {
+  const sessionId = req.params.id;
+  const session = activeSessions.get(sessionId);
+  
+  if (session) {
+    clearInterval(session.interval);
+    clearInterval(session.keep);
+    activeSessions.delete(sessionId);
+    broadcast({ message: `🛑 Session ${sessionId} stopped!`, status: `Sessions: ${activeSessions.size}` });
   }
+  
   res.json({ success: true });
 });
 
-app.post("/stop-all", (req, res) => {
-  activeThreads.forEach((thread, id) => {
-    clearInterval(thread.interval);
-    thread.api.logout(() => {});
-  });
-  activeThreads.clear();
-  logs.push({ time: Date.now(), message: `💥 ALL OPERATIONS STOPPED` });
-  res.json({ success: true });
-});
-
+// ---------------- START SERVER ----------------
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 HENRY-X LUXURY running on port ${PORT}`);
-  logs.push({ time: Date.now(), message: `🎉 Server started on port ${PORT}` });
+  console.log("💜 HENRY-X LUXURY v2.0 running on port", PORT);
+  console.log("🎨 Pink + Purple Theme | Hatwriter Ready!");
 });
