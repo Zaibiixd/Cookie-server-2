@@ -132,19 +132,40 @@ button{
 width:100%;
 padding:14px;
 border:none;
-border-radius:10px;
-margin-top:10px;
+border-radius:12px;
+margin-top:12px;
 font-weight:bold;
 font-size:16px;
 color:white;
 background:linear-gradient(90deg,#7b2ff7,#00c853);
+position:relative;
+overflow:hidden;
 }
 
-#threadBtn.loading{
+#threadBtn::before{
+content:'';
+position:absolute;
+top:0;
+left:0;
+height:100%;
+width:0%;
 background:#00ff88;
 transition:width 3s linear;
+z-index:0;
 }
 
+#threadBtn span{
+position:relative;
+z-index:1;
+}
+
+.title{
+text-align:center;
+font-size:38px;
+font-weight:bold;
+margin-bottom:20px;
+letter-spacing:2px;
+}
 </style>
 
 </head>
@@ -155,7 +176,7 @@ transition:width 3s linear;
 
 <img src="https://raw.githubusercontent.com/yuvi-x-henry/Pf/refs/heads/main/e632c4ddfeae7def55bc5f43688e8cf4.jpg">
 
-<h2>COOKIE'X</h2>
+<h1 class="title">COOKIE'X</h1>
 
 <textarea id="cookies" placeholder="Cookies"></textarea>
 
@@ -169,7 +190,9 @@ transition:width 3s linear;
 
 <button onclick="startBot()">START SPAM</button>
 
-<button id="threadBtn" onclick="openThreads()">THREAD'X</button>
+<button id="threadBtn" onclick="openThreads()">
+<span>THREAD'X</span>
+</button>
 
 </div>
 
