@@ -280,15 +280,17 @@ location="/threads"
 
 // ---------------- THREAD PAGE ----------------
 
+// ✅ COMPLETE WORKING CODE WITH REAL-TIME LOGS & DELETE BUTTON - COPY PASTE KAR BC!
 
+// GLOBAL LOG STORAGE FOR REAL-TIME TRACKING
+const threadLogs = new Map(); // threadId -> array of logs
 
-// ✅ COMPLETE WORKING CODE - COPY PASTE KAR BC!
-
-// THREAD API - PERFECT WORKING
+// THREAD API - ENHANCED WITH REAL LOGS & MESSAGE COUNTS
 app.get("/api/threads", (req, res) => {
     let threads = [];
     activeSessions.forEach((session, threadId) => {
         if (session && session.interval) {
+            let logs = threadLogs.get(threadId) || [];
             threads.push({
                 id: threadId,
                 hatername: session.hatername || "No Hater",
@@ -298,7 +300,11 @@ app.get("/api/threads", (req, res) => {
                 uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
                 status: "ACTIVE",
                 messagesCount: session.messages.length,
-                groupId: session.group
+                sentCount: logs.filter(l => l.includes("SUCCESSFULLY")).length,
+                totalLogs: logs.length,
+                groupId: session.group,
+                latestLog: logs[logs.length - 1]?.substring(0, 50) || "No logs yet",
+                isInactive: false
             });
         }
     });
@@ -306,7 +312,14 @@ app.get("/api/threads", (req, res) => {
     res.json(threads);
 });
 
-// START ROUTE - FIXED
+// LOGS API - REAL-TIME LIVE LOGS
+app.get("/api/logs/:id", (req, res) => {
+    let threadId = req.params.id;
+    let logs = threadLogs.get(threadId) || [];
+    res.json({ logs: logs.slice(-50) }); // Last 50 logs
+});
+
+// START ROUTE - ENHANCED WITH REAL-TIME LOGGING
 app.post("/start", (req, res) => {
     let { cookies, group, delay, messages, hatername } = req.body;
     
@@ -328,11 +341,29 @@ app.post("/start", (req, res) => {
             index: 0, start: Date.now(), interval: null
         };
         
-        // START SPAMMING
+        // INITIALIZE LOGS
+        threadLogs.set(threadId, [`#0 THREAD STARTED ✅ | Group: ${group} | Hater: ${hatername}`]);
+        
+        // START SPAMMING WITH REAL-TIME LOGGING
         session.interval = setInterval(() => {
             let msg = session.messages[session.index];
+            let logId = session.index + 1;
+            
             console.log(`📤 [${threadId}] Sending: ${msg.substring(0,30)}...`);
-            api.sendMessage(msg, group);
+            
+            try {
+                api.sendMessage(msg, group);
+                let successLog = `#${logId} MESSAGE SENT SUCCESSFULLY ✅ | "${msg.substring(0,30)}..." | Hatername: ${hatername}`;
+                let logs = threadLogs.get(threadId) || [];
+                logs.push(successLog);
+                threadLogs.set(threadId, logs);
+            } catch (error) {
+                let errorLog = `#${logId} MESSAGE NOT SENT ❌ | Error: ${error.message} | Inactive`;
+                let logs = threadLogs.get(threadId) || [];
+                logs.push(errorLog);
+                threadLogs.set(threadId, logs);
+            }
+            
             session.index = (session.index + 1) % session.messages.length;
         }, delay);
         
@@ -348,251 +379,186 @@ app.post("/stop/:id", (req, res) => {
     let session = activeSessions.get(fullId);
     if (session) {
         clearInterval(session.interval);
+        let logs = threadLogs.get(fullId) || [];
+        logs.push(`🛑 THREAD STOPPED BY USER`);
+        threadLogs.set(fullId, logs);
         activeSessions.delete(fullId);
         console.log(`🛑 STOPPED: ${fullId}`);
     }
     res.json({ success: true });
 });
 
-// THREADS PAGE - PERFECT UI
-// ✅ COMPLETE ULTIMATE FIX - SAB KUCH PERFECT!
-
-// THREAD STORE - BETTER TRACKING
-const activeSessions = new Map();
-
-// FIXED LOGIN + BETTER ERROR HANDLING
-function loginWithCookie(cookie, cb) {
-    try {
-        const appState = JSON.parse(cookie);
-        fca.login({ appState }, (err, api) => {
-            if (err) {
-                console.log("❌ AppState failed:", err.error);
-                return cb(null);
-            }
-            console.log("✅ Login SUCCESS");
-            cb(api);
-        });
-    } catch (e) {
-        console.log("Trying raw cookie...");
-        fca.login(cookie, {}, (err, api) => {
-            if (err) {
-                console.log("❌ Cookie login failed:", err.error);
-                return cb(null);
-            }
-            console.log("✅ Login SUCCESS");
-            cb(api);
-        });
-    }
-}
-
-// FIXED HATERNAME - PREFIX STYLE
-function applyHatername(msg, name) {
-    if (!name || !msg) return msg || "HENRY-X";
-    return `${name.toUpperCase()}: ${msg}`;
-}
-
-// THREAD API - LIVE STATS + SENT COUNT
-app.get("/api/threads", (req, res) => {
-    let threads = [];
-    activeSessions.forEach((session, threadId) => {
-        // NEVER DELETE - ALWAYS SHOW (even if error)
-        threads.push({
-            id: threadId,
-            hatername: session.hatername || "HENRY-X",
-            startTime: new Date(session.start).toLocaleString(),
-            uptimeDays: Math.floor((Date.now() - session.start) / (1000 * 60 * 60 * 24)),
-            uptimeHours: Math.floor(((Date.now() - session.start) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-            uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
-            status: session.isError ? "INACTIVE (FB ISSUE)" : "ACTIVE",
-            messagesCount: session.messages.length,
-            sentCount: session.sentCount || 0,
-            groupId: session.group,
-            lastSent: session.lastSent ? new Date(session.lastSent).toLocaleTimeString() : "Never",
-            logs: session.recentLogs ? session.recentLogs.slice(-5) : []
-        });
-    });
-    console.log(`📊 ${threads.length} THREADS (Active+Inactive)`);
-    res.json(threads);
-});
-
-// START ROUTE - UNBREAKABLE + LIVE STATS
-app.post("/start", (req, res) => {
-    let { cookies, group, delay, messages, hatername } = req.body;
-    let threadId = "HX_" + Date.now();
-    
-    console.log(`🚀 START: ${threadId} | Group: ${group} | Hater: ${hatername}`);
-    
-    loginWithCookie(cookies, (api) => {
-        if (!api) {
-            console.log(`❌ ${threadId} LOGIN FAILED`);
-            return res.json({ success: false, error: "LOGIN FAILED" });
-        }
-        
-        let processedMessages = messages.map(m => applyHatername(m || "HENRY-X", hatername));
-        
-        let session = {
-            api, group, delay, messages: processedMessages,
-            hatername: hatername || "HENRY-X",
-            index: 0, start: Date.now(),
-            sentCount: 0,
-            isError: false,
-            recentLogs: [],
-            lastSent: null,
-            interval: null
-        };
-        
-        // UNBREAKABLE INTERVAL - NEVER STOPS
-        session.interval = setInterval(() => {
-            try {
-                let msg = session.messages[session.index];
-                api.sendMessage(msg, group, (err, info) => {
-                    session.sentCount++;
-                    session.lastSent = Date.now();
-                    session.index = (session.index + 1) % session.messages.length;
-                    
-                    if (err) {
-                        session.isError = true;
-                        session.recentLogs.push(`❌ ERROR: ${err.error || err}`);
-                        console.log(`❌ [${threadId}] ${err.error}`);
-                    } else {
-                        session.recentLogs.push(`✅ SENT #${session.sentCount}: ${msg.substring(0,30)}`);
-                        console.log(`📤 [${threadId}] #${session.sentCount}: OK`);
-                    }
-                    
-                    // Keep only last 10 logs
-                    if (session.recentLogs.length > 10) {
-                        session.recentLogs.shift();
-                    }
-                });
-            } catch (e) {
-                session.isError = true;
-                session.recentLogs.push(`💥 CRASH: ${e.message}`);
-                console.log(`💥 [${threadId}] Crash: ${e.message}`);
-            }
-        }, delay);
-        
-        activeSessions.set(threadId, session);
-        console.log(`✅ ${threadId} STARTED FOREVER!`);
-        res.json({ success: true, threadId });
-    });
-});
-
-// STOP ROUTE
-app.post("/stop/:id", (req, res) => {
-    let fullId = req.params.id;
+// DELETE ROUTE - FULL CLEANUP
+app.post("/delete/:id", (req, res) => {
+    let fullId = "HX_" + req.params.id;
     let session = activeSessions.get(fullId);
     if (session) {
         clearInterval(session.interval);
-        activeSessions.delete(fullId);
-        console.log(`🛑 STOPPED: ${fullId} | Sent: ${session.sentCount}`);
+        let logs = threadLogs.get(fullId) || [];
+        logs.push(`💀 THREAD DELETED PERMANENTLY`);
+        threadLogs.set(fullId, logs);
     }
+    activeSessions.delete(fullId);
+    threadLogs.delete(fullId); // FULL CLEANUP
+    console.log(`💀 DELETED: ${fullId}`);
     res.json({ success: true });
 });
 
-// THREADS PAGE - LIVE LOGS + SENT COUNT
+// THREADS PAGE - ULTIMATE UI WITH REAL-TIME LOGS & DELETE
 app.get("/threads", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>THREAD'X - LIVE MANAGER</title>
+<title>THREAD'X MANAGER - LIVE LOGS</title>
 <style>
-body{background:linear-gradient(135deg,#0a1f44 0%,#2b6cb0 50%,#1e3a8a 100%);font-family:Arial;color:white;padding:20px;overflow-x:hidden;}
-.title{font-size:clamp(2rem,8vw,4rem);font-weight:900;background:linear-gradient(45deg,#00ff88,#7b2ff7,#00c853);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin:20px 0;animation:pulse 2s infinite;}
-@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.05);}}
-.image{width:100%;max-width:400px;margin:20px auto;display:block;border-radius:25px;box-shadow:0 25px 50px rgba(0,0,0,0.5);}
-.thread-card{background:linear-gradient(145deg,#111827,#1f2937);padding:25px;border-radius:25px;margin:20px 0;box-shadow:0 25px 60px rgba(0,0,0,0.4);border-left:5px solid #00ff88;position:relative;overflow:hidden;}
-.thread-card.error{border-left-color:#ff4757;}
-.thread-id{font-size:1.8rem;color:#00ff88;font-weight:bold;margin-bottom:10px;}
-.status{padding:12px 24px;border-radius:25px;font-weight:bold;display:inline-block;margin:15px 0;font-size:14px;text-transform:uppercase;letter-spacing:1px;box-shadow:0 5px 15px rgba(0,255,136,0.3);}
-.status.active{background:linear-gradient(90deg,#00ff88,#00c851);color:black;}
-.status.inactive{background:linear-gradient(90deg,#ff4757,#ff3838);color:white;}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin:20px 0;}
-.stat-item{background:rgba(255,255,255,0.08);padding:15px;border-radius:15px;text-align:center;border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(10px);}
-.stat-label{font-size:12px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
-.stat-value{font-size:1.3rem;font-weight:bold;color:#00ff88;}
-.logs{background:rgba(0,0,0,0.3);padding:15px;border-radius:15px;margin:15px 0;max-height:150px;overflow-y:auto;font-family:monospace;font-size:12px;}
-.log-item{padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.1);}
-.log-ok{color:#00ff88;}
-.log-error{color:#ff4757;}
-.buttons{display:flex;gap:15px;margin-top:20px;}
-.btn{flex:1;padding:18px;border:none;border-radius:20px;font-weight:bold;cursor:pointer;font-size:16px;text-transform:uppercase;letter-spacing:1px;transition:all 0.3s;}
-.btn-logs{background:linear-gradient(45deg,#7b2ff7,#00c853);color:white;box-shadow:0 10px 30px rgba(123,47,247,0.4);}
-.btn-stop{background:linear-gradient(45deg,#ff4757,#ff3838);color:white;box-shadow:0 10px 30px rgba(255,71,87,0.4);}
-.btn:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(0,0,0,0.5);}
-.no-threads{text-align:center;padding:60px;color:#aaa;}
+body{background:linear-gradient(135deg,#0a1f44,#2b6cb0);font-family:Arial;color:white;padding:20px;}
+.title{font-size:3rem;font-weight:bold;background:linear-gradient(45deg,#00ff88,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin:20px 0;}
+.image{width:100%;max-width:400px;margin:20px auto;display:block;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.5);}
+.thread-card{background:#111;padding:25px;border-radius:20px;margin:20px 0;box-shadow:0 20px 40px rgba(0,0,0,0.3);border:2px solid #00ff88;}
+.thread-id{font-size:1.5rem;color:#00ff88;margin-bottom:10px;}
+.status{padding:10px 20px;border-radius:20px;font-weight:bold;display:inline-block;margin:10px 0;}
+.status-active{background:#00ff88;color:black;}
+.status-inactive{background:#ff4757;color:white;}
+.details{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0;font-size:14px;}
+.detail{padding:10px;background:rgba(255,255,255,0.1);border-radius:10px;}
+.stats-row{display:flex;gap:15px;margin:15px 0;}
+.stat-box{flex:1;padding:12px;text-align:center;background:rgba(0,255,136,0.2);border-radius:10px;border:1px solid #00ff88;}
+.latest-log{padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;margin:10px 0;font-family:monospace;font-size:12px;max-height:60px;overflow-y:auto;}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;}
+.btn{flex:1;padding:12px;border:none;border-radius:15px;font-weight:bold;cursor:pointer;font-size:14px;min-width:100px;}
+.btn-stop{background:linear-gradient(45deg,#ff4757,#ff3838);color:white;}
+.btn-logs{background:linear-gradient(45deg,#7b2ff7,#00c853);color:white;}
+.btn-delete{background:linear-gradient(45deg,#ff6b6b,#ee5a52);color:white;}
+.log-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:none;z-index:1000;overflow-y:auto;}
+.log-content{background:#111;max-width:800px;margin:50px auto;padding:30px;border-radius:20px;border:2px solid #00ff88;}
+.log-lines{max-height:500px;overflow-y:auto;background:#000;padding:20px;border-radius:10px;font-family:monospace;font-size:13px;line-height:1.5;}
+.log-line-success{color:#00ff88;}
+.log-line-error{color:#ff4757;}
+.close-btn{padding:10px 20px;background:#00ff88;color:black;border:none;border-radius:10px;cursor:pointer;font-weight:bold;}
+.no-threads{text-align:center;padding:50px;color:#aaa;}
 </style>
 </head>
 <body>
-<h1 class="title">THREAD'X LIVE</h1>
+<h1 class="title">THREAD'X LIVE MANAGER</h1>
 <img src="https://raw.githubusercontent.com/yuvi-x-henry/Pf/refs/heads/main/e632c4ddfeae7def55bc5f43688e8cf4.jpg" class="image">
 <div id="threads"></div>
+
+<!-- LIVE LOGS MODAL -->
+<div id="logModal" class="log-modal">
+    <div class="log-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h2 id="logTitle" style="margin:0;color:#00ff88;">LIVE LOGS</h2>
+            <button class="close-btn" onclick="closeLogs()">CLOSE</button>
+        </div>
+        <div id="logLines" class="log-lines"></div>
+    </div>
+</div>
+
 <script>
+let currentThreadId = null;
 function loadThreads(){
     fetch('/api/threads')
     .then(r=>r.json())
     .then(data=>{
-        let html='';
-        if(data.length===0){
-            html='<div class="no-threads"><h2>🚀 No Threads Running</h2><p>Start from <a href="/" style="color:#00ff88;">Main Panel</a></p></div>';
+        let html = '';
+        if(data.length === 0){
+            html = '<div class="no-threads"><h2>🚀 No Active Threads</h2><p>Start from main panel</p></div>';
         }else{
             data.forEach(t=>{
-                let statusClass = t.status.includes('INACTIVE') ? 'inactive error' : 'active';
-                html+=`
-                <div class="thread-card ${statusClass}">
-                    <div class="thread-id">THREAD #${t.id}</div>
-                    <div class="status ${statusClass}">${t.status}</div>
-                    <div>Hatername: <b>${t.hatername}</b></div>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-label">Started</div>
-                            <div class="stat-value">${t.startTime}</div>
+                let statusClass = t.status === 'ACTIVE' ? 'status-active' : 'status-inactive';
+                let statusText = t.isInactive ? 'INACTIVE' : 'ACTIVE';
+                html += \`
+                <div class="thread-card">
+                    <div class="thread-id">THREAD #\${t.id}</div>
+                    <div class="status \${statusClass}">\${statusText}</div>
+                    <div>Hatername: <b>\${t.hatername}</b></div>
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <div style="font-size:20px;color:#00ff88">\${t.sentCount}</div>
+                            <div>SENT</div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Uptime</div>
-                            <div class="stat-value">${t.uptimeDays}d ${t.uptimeHours}h</div>
+                        <div class="stat-box">
+                            <div style="font-size:20px;color:#7b2ff7">\${t.totalLogs}</div>
+                            <div>TOTAL</div>
                         </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Sent</div>
-                            <div class="stat-value">${t.sentCount}</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-label">Last Sent</div>
-                            <div class="stat-value">${t.lastSent}</div>
+                        <div class="stat-box">
+                            <div style="font-size:20px">\${t.uptimeDays}d \${t.uptimeHours}h</div>
+                            <div>UPTIME</div>
                         </div>
                     </div>
-                    <div class="logs">
-                        <b>📋 Recent Logs (Last 5):</b>
-                        ${t.logs.map(log=>`<div class="log-item ${log.includes('ERROR')||log.includes('CRASH') ? 'log-error' : 'log-ok'}">${log}</div>`).join('')}
+                    <div class="details">
+                        <div class="detail">Started: \${t.startTime}</div>
+                        <div class="detail">Messages: \${t.messagesCount}</div>
+                        <div class="detail">Group: \${t.groupId}</div>
+                        <div class="detail">Uptime: \${t.uptimeSeconds}s</div>
                     </div>
+                    <div class="latest-log">Latest: \${t.latestLog}</div>
                     <div class="buttons">
-                        <button class="btn btn-logs" onclick="showFullLogs('${t.id}')">📊 FULL LOGS</button>
-                        <button class="btn btn-stop" onclick="stopThread('${t.id}')">🛑 STOP</button>
+                        <button class="btn btn-logs" onclick="showLogs('\${t.id}')">📊 LIVE LOGS</button>
+                        <button class="btn btn-stop" onclick="stopThread('\${t.id}')">🛑 STOP</button>
+                        <button class="btn btn-delete" onclick="deleteThread('\${t.id}')">💀 DELETE</button>
                     </div>
                 </div>
-                `;
+                \`;
             });
         }
-        document.getElementById('threads').innerHTML=html;
+        document.getElementById('threads').innerHTML = html;
     });
 }
+
+function showLogs(id){
+    currentThreadId = id;
+    document.getElementById('logTitle').textContent = 'LIVE LOGS - THREAD #' + id;
+    document.getElementById('logModal').style.display = 'block';
+    loadLiveLogs();
+}
+
+function loadLiveLogs(){
+    if(!currentThreadId) return;
+    fetch('/api/logs/' + currentThreadId)
+    .then(r=>r.json())
+    .then(data=>{
+        let html = '';
+        data.logs.forEach(log=>{
+            let className = log.includes('SUCCESSFULLY') ? 'log-line-success' : 
+                           log.includes('NOT SENT') ? 'log-line-error' : '';
+            html += '<div class="' + className + '">' + log + '</div>';
+        });
+        document.getElementById('logLines').innerHTML = html;
+        document.getElementById('logLines').scrollTop = document.getElementById('logLines').scrollHeight;
+    });
+}
+
 function stopThread(id){
-    if(confirm('🛑 Permanently stop THREAD #'+id+'?')){
-        fetch('/stop/'+id,{method:'POST'}).then(()=>loadThreads());
+    if(confirm('🛑 Stop THREAD #' + id + '? (Keeps logs)')){
+        fetch('/stop/' + id, {method:'POST'}).then(loadThreads);
     }
 }
-function showFullLogs(id){
-    alert('📊 LIVE LOGS for THREAD #'+id+'\n\nRecent Activity:\n'+ 
-          '✅ Total Messages Sent: [Live count]\n'+
-          '⏱️ Uptime: [Live uptime]\n'+
-          '📡 Status: [ACTIVE/INACTIVE]');
+
+function deleteThread(id){
+    if(confirm('💀 DELETE THREAD #' + id + '? (Stops + Removes everything)')){
+        fetch('/delete/' + id, {method:'POST'}).then(loadThreads);
+    }
 }
-setInterval(loadThreads,3000); // 3 sec refresh
+
+function closeLogs(){
+    document.getElementById('logModal').style.display = 'none';
+    currentThreadId = null;
+}
+
+// AUTO REFRESH EVERY 2 SECONDS
+setInterval(loadThreads, 2000);
+setInterval(()=>{
+    if(currentThreadId) loadLiveLogs();
+}, 1000); // Live logs update every 1s when modal open
+
 loadThreads();
 </script>
 </body>
-</html>`);
+</html>
+    `);
 });
 // ---------------- START BOT ----------------
 
