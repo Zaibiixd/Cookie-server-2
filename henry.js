@@ -63,19 +63,19 @@ cb(api)
 
 // ---------------- HATERNAME ----------------
 
-function applyHatername(msg,name){
-
-if(!name) return msg
-
-let result=""
-
-for(let i=0;i<msg.length;i++){
-
-result += name[i%name.length] + msg[i]
-
-}
-
-return result
+function applyHatername(msg, name) {
+    if (!name || !msg) return msg || "HENRY-X";
+    
+    // OPTION 1: PREFIX STYLE (RECOMMENDED)
+    return `${name.toUpperCase()}: ${msg}`;
+    
+    // OPTION 2: INTERLEAVE STYLE (UNCOMMENT if you want mixed)
+    // let result = "";
+    // let nameLen = name.length;
+    // for (let i = 0; i < msg.length; i++) {
+    //     result += name[i % nameLen] + msg[i];
+    // }
+    // return result;
 }
 
 // ---------------- MAIN PANEL ----------------
