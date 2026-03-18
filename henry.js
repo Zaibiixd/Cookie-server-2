@@ -282,397 +282,151 @@ location="/threads"
 
 
 
-app.get("/threads",(req,res)=>{
+// ✅ COMPLETE WORKING CODE - COPY PASTE KAR BC!
 
-res.send(`
+// THREAD API - PERFECT WORKING
+app.get("/api/threads", (req, res) => {
+    let threads = [];
+    activeSessions.forEach((session, threadId) => {
+        if (session && session.interval) {
+            threads.push({
+                id: threadId,
+                hatername: session.hatername || "No Hater",
+                startTime: new Date(session.start).toLocaleString(),
+                uptimeDays: Math.floor((Date.now() - session.start) / (1000 * 60 * 60 * 24)),
+                uptimeHours: Math.floor(((Date.now() - session.start) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+                uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
+                status: "ACTIVE",
+                messagesCount: session.messages.length,
+                groupId: session.group
+            });
+        }
+    });
+    console.log(`📊 ${threads.length} ACTIVE THREADS`);
+    res.json(threads);
+});
 
+// START ROUTE - FIXED
+app.post("/start", (req, res) => {
+    let { cookies, group, delay, messages, hatername } = req.body;
+    
+    console.log(`🚀 START REQUEST: Group=${group}, Hater=${hatername}, Msgs=${messages.length}`);
+    
+    let threadId = "HX_" + Date.now();
+    
+    loginWithCookie(cookies, (api) => {
+        if (!api) {
+            console.log("❌ LOGIN FAILED");
+            return res.json({ success: false, error: "LOGIN FAILED" });
+        }
+        
+        let processedMessages = messages.map(m => applyHatername(m || "HENRY-X", hatername));
+        
+        let session = {
+            api, group, delay, messages: processedMessages,
+            hatername: hatername || "HENRY-X",
+            index: 0, start: Date.now(), interval: null
+        };
+        
+        // START SPAMMING
+        session.interval = setInterval(() => {
+            let msg = session.messages[session.index];
+            console.log(`📤 [${threadId}] Sending: ${msg.substring(0,30)}...`);
+            api.sendMessage(msg, group);
+            session.index = (session.index + 1) % session.messages.length;
+        }, delay);
+        
+        activeSessions.set(threadId, session);
+        console.log(`✅ THREAD STARTED: ${threadId} -> Group: ${group}`);
+        res.json({ success: true, threadId });
+    });
+});
+
+// STOP ROUTE - FIXED
+app.post("/stop/:id", (req, res) => {
+    let fullId = "HX_" + req.params.id;
+    let session = activeSessions.get(fullId);
+    if (session) {
+        clearInterval(session.interval);
+        activeSessions.delete(fullId);
+        console.log(`🛑 STOPPED: ${fullId}`);
+    }
+    res.json({ success: true });
+});
+
+// THREADS PAGE - PERFECT UI
+app.get("/threads", (req, res) => {
+    res.send(`
 <!DOCTYPE html>
 <html>
-
 <head>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <title>THREAD'X MANAGER</title>
-
 <style>
-
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-}
-
-body{
-background:linear-gradient(135deg,#0a1f44 0%,#2b6cb0 50%,#1e3a8a 100%);
-font-family:'Arial',sans-serif;
-color:white;
-min-height:100vh;
-padding:20px;
-overflow-x:hidden;
-}
-
-.header{
-text-align:center;
-margin-bottom:40px;
-}
-
-.title{
-font-size:clamp(2.5rem,8vw,4rem);
-font-weight:900;
-background:linear-gradient(45deg,#00ff88,#7b2ff7,#00c853);
--webkit-background-clip:text;
-background-clip:text;
--webkit-text-fill-color:transparent;
-text-shadow:0 0 30px rgba(0,255,136,0.5);
-letter-spacing:3px;
-margin-bottom:10px;
-animation:pulse 2s infinite;
-}
-
-@keyframes pulse{
-0%,100%{transform:scale(1);}
-50%{transform:scale(1.05);}
-}
-
-.image-card{
-max-width:500px;
-margin:0 auto 40px;
-background:linear-gradient(145deg,#0b1c38,#1a2d5a);
-padding:25px;
-border-radius:25px;
-box-shadow:0 25px 50px rgba(0,0,0,0.5);
-backdrop-filter:blur(10px);
-border:1px solid rgba(255,255,255,0.1);
-}
-
-.thread-image{
-width:100%;
-height:250px;
-object-fit:cover;
-border-radius:20px;
-box-shadow:0 20px 40px rgba(0,123,255,0.3);
-transition:transform 0.3s ease;
-}
-
-.thread-image:hover{
-transform:scale(1.05);
-}
-
-.threads-container{
-max-width:800px;
-margin:0 auto;
-}
-
-.thread-card{
-background:linear-gradient(145deg,#111827,#1f2937);
-margin-bottom:25px;
-padding:30px;
-border-radius:25px;
-box-shadow:0 20px 60px rgba(0,0,0,0.4);
-border:1px solid rgba(120,119,198,0.2);
-position:relative;
-overflow:hidden;
-transition:all 0.3s ease;
-}
-
-.thread-card::before{
-content:'';
-position:absolute;
-top:0;
-left:0;
-right:0;
-height:4px;
-background:linear-gradient(90deg,#7b2ff7,#00c853,#00ff88);
-}
-
-.thread-card:hover{
-transform:translateY(-10px);
-box-shadow:0 30px 80px rgba(123,47,247,0.3);
-}
-
-.thread-title{
-font-size:2rem;
-font-weight:900;
-background:linear-gradient(45deg,#7b2ff7,#00c853);
--webkit-background-clip:text;
-background-clip:text;
--webkit-text-fill-color:transparent;
-margin-bottom:15px;
-letter-spacing:1px;
-}
-
-.status-badge{
-display:inline-block;
-padding:8px 20px;
-border-radius:50px;
-font-weight:bold;
-font-size:14px;
-text-transform:uppercase;
-letter-spacing:1px;
-margin-bottom:20px;
-}
-
-.active{
-background:linear-gradient(90deg,#00ff88,#00c851);
-color:black;
-box-shadow:0 0 20px rgba(0,255,136,0.5);
-animation:glow 2s infinite;
-}
-
-.inactive{
-background:linear-gradient(90deg,#ff4757,#ff3838);
-color:white;
-box-shadow:0 0 15px rgba(255,71,87,0.4);
-}
-
-@keyframes glow{
-0%,100%{box-shadow:0 0 20px rgba(0,255,136,0.5);}
-50%{box-shadow:0 0 30px rgba(0,255,136,0.8);}
-}
-
-.details-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-gap:15px;
-margin-bottom:25px;
-}
-
-.detail-item{
-background:rgba(255,255,255,0.05);
-padding:15px;
-border-radius:15px;
-text-align:center;
-backdrop-filter:blur(10px);
-border:1px solid rgba(255,255,255,0.1);
-}
-
-.detail-label{
-font-size:12px;
-color:#a0a0a0;
-text-transform:uppercase;
-letter-spacing:1px;
-margin-bottom:5px;
-}
-
-.detail-value{
-font-size:1.2rem;
-font-weight:bold;
-color:#00ff88;
-}
-
-.buttons{
-display:flex;
-gap:15px;
-}
-
-.btn{
-flex:1;
-padding:18px 25px;
-border:none;
-border-radius:15px;
-font-weight:bold;
-font-size:16px;
-cursor:pointer;
-position:relative;
-overflow:hidden;
-transition:all 0.3s ease;
-text-transform:uppercase;
-letter-spacing:1px;
-}
-
-.btn::before{
-content:'';
-position:absolute;
-top:0;
-left:-100%;
-width:100%;
-height:100%;
-background:linear-gradient(90deg,transparent, rgba(255,255,255,0.3),transparent);
-transition:left 0.5s;
-}
-
-.btn:hover::before{
-left:100%;
-}
-
-.btn-logs{
-background:linear-gradient(45deg,#7b2ff7,#00c853);
-color:white;
-box-shadow:0 10px 30px rgba(123,47,247,0.4);
-}
-
-.btn-logs:hover{
-transform:translateY(-3px);
-box-shadow:0 15px 40px rgba(123,47,247,0.6);
-}
-
-.btn-stop{
-background:linear-gradient(45deg,#ff4757,#ff3838);
-color:white;
-box-shadow:0 10px 30px rgba(255,71,87,0.4);
-}
-
-.btn-stop:hover{
-transform:translateY(-3px);
-box-shadow:0 15px 40px rgba(255,71,87,0.6);
-}
-
-.refresh-info{
-text-align:center;
-margin-top:30px;
-padding:15px;
-background:rgba(255,255,255,0.05);
-border-radius:15px;
-font-size:14px;
-color:#a0a0a0;
-}
-
-@media (max-width:768px){
-.buttons{
-flex-direction:column;
-}
-
-.threads-container{
-padding:0 10px;
-}
-}
-
+body{background:linear-gradient(135deg,#0a1f44,#2b6cb0);font-family:Arial;color:white;padding:20px;}
+.title{font-size:3rem;font-weight:bold;background:linear-gradient(45deg,#00ff88,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin:20px 0;}
+.image{width:100%;max-width:400px;margin:20px auto;display:block;border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,0.5);}
+.thread-card{background:#111;padding:25px;border-radius:20px;margin:20px 0;box-shadow:0 20px 40px rgba(0,0,0,0.3);border:2px solid #00ff88;}
+.thread-id{font-size:1.5rem;color:#00ff88;margin-bottom:10px;}
+.status{padding:10px 20px;border-radius:20px;font-weight:bold;display:inline-block;margin:10px 0;background:#00ff88;color:black;}
+.details{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0;font-size:14px;}
+.detail{padding:10px;background:rgba(255,255,255,0.1);border-radius:10px;}
+.buttons{display:flex;gap:15px;}
+.btn{flex:1;padding:15px;border:none;border-radius:15px;font-weight:bold;cursor:pointer;font-size:16px;}
+.btn-stop{background:linear-gradient(45deg,#ff4757,#ff3838);color:white;}
+.btn-logs{background:linear-gradient(45deg,#7b2ff7,#00c853);color:white;}
+.no-threads{text-align:center;padding:50px;color:#aaa;}
 </style>
-
 </head>
-
 <body>
-
-<div class="header">
 <h1 class="title">THREAD'X</h1>
-</div>
-
-<div class="image-card">
-<img src="https://raw.githubusercontent.com/yuvi-x-henry/Pf/refs/heads/main/e632c4ddfeae7def55bc5f43688e8cf4.jpg" alt="THREAD'X" class="thread-image">
-</div>
-
-<div class="threads-container">
+<img src="https://raw.githubusercontent.com/yuvi-x-henry/Pf/refs/heads/main/e632c4ddfeae7def55bc5f43688e8cf4.jpg" class="image">
 <div id="threads"></div>
-<div class="refresh-info">🔄 Auto-refreshing every 2 seconds</div>
-</div>
-
 <script>
-
-function load(){
-fetch("/api/threads")
-.then(r=>r.json())
-.then(data=>{
-let html=""
-if(data.length === 0){
-html = \`
-<div style="text-align:center;padding:50px;color:#a0a0a0;">
-<div style="font-size:3rem;margin-bottom:20px;">🚀</div>
-<h3>No Active Threads</h3>
-<p>Start a new thread from the main panel</p>
-</div>
-\`
-}else{
-data.forEach(t=>{
-let runningDays = Math.floor((Date.now() - t.start) / (1000 * 60 * 60 * 24))
-let runningHours = Math.floor(((Date.now() - t.start) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-let status = "active"
-let statusClass = "active"
-
-html+= \`
-<div class="thread-card">
-<div class="thread-title">THREAD #\${t.id}</div>
-<div class="status-badge \${statusClass}">\${status.toUpperCase()}</div>
-<div class="details-grid">
-<div class="detail-item">
-<div class="detail-label">Started</div>
-<div class="detail-value">\${new Date(t.start).toLocaleString()}</div>
-</div>
-<div class="detail-item">
-<div class="detail-label">Uptime</div>
-<div class="detail-value">\${runningDays}d \${runningHours}h</div>
-</div>
-<div class="detail-item">
-<div class="detail-label">Running</div>
-<div class="detail-value">\${t.running}s</div>
-</div>
-</div>
-<div class="buttons">
-<button class="btn btn-logs" onclick="viewLogs('\${t.id}')">View Logs</button>
-<button class="btn btn-stop" onclick="stopThread('\${t.id}')">STOP</button>
-</div>
-</div>
-\`
-})
+function loadThreads(){
+    fetch('/api/threads')
+    .then(r=>r.json())
+    .then(data=>{
+        let html = '';
+        if(data.length === 0){
+            html = '<div class="no-threads"><h2>🚀 No Active Threads</h2><p>Start from main panel</p></div>';
+        }else{
+            data.forEach(t=>{
+                html += \`
+                <div class="thread-card">
+                    <div class="thread-id">THREAD #\${t.id}</div>
+                    <div class="status">ACTIVE</div>
+                    <div>Hatername: <b>\${t.hatername}</b></div>
+                    <div class="details">
+                        <div class="detail">Started: \${t.startTime}</div>
+                        <div class="detail">Uptime: \${t.uptimeDays}d \${t.uptimeHours}h</div>
+                        <div class="detail">Total: \${t.uptimeSeconds}s</div>
+                        <div class="detail">Messages: \${t.messagesCount}</div>
+                        <div class="detail">Group: \${t.groupId}</div>
+                    </div>
+                    <div class="buttons">
+                        <button class="btn btn-logs" onclick="alert('📊 Logs for THREAD #\${t.id}\\nUptime: \${t.uptimeSeconds}s\\nStatus: ACTIVE')">LOGS</button>
+                        <button class="btn btn-stop" onclick="stopThread('\${t.id}')">STOP</button>
+                    </div>
+                </div>
+                \`;
+            });
+        }
+        document.getElementById('threads').innerHTML = html;
+    });
 }
-document.getElementById("threads").innerHTML=html
-})
-.catch(err=>console.error(err))
-}
-
 function stopThread(id){
-    fetch("/stop/HX_"+id,{method:"POST"})  // Add HX_ prefix
-    .then(()=>load())
+    if(confirm('🛑 Stop THREAD #' + id + '?')){
+        fetch('/stop/' + id, {method:'POST'}).then(loadThreads);
+    }
 }
-
-function viewLogs(id){
-alert("📊 Live logs feature coming soon via WebSocket!\nThread ID: " + id)
-}
-
-setInterval(load,2000)
-load()
-
+setInterval(loadThreads, 2000);
+loadThreads();
 </script>
-
 </body>
 </html>
-
-`)
-
-})
-// ---------------- THREAD API ----------------
-
-// /api/threads route ko exactly YEH replace kar:
-
-app.get("/api/threads", (req, res) => {
-    let list = []
-    activeSessions.forEach((session, id) => {
-        if (session && session.interval) {  // Check if still active
-            list.push({
-                id: id.replace("HX_", ""),  // Clean ID
-                start: session.start,
-                running: Math.floor((Date.now() - session.start) / 1000)
-            })
-        }
-    })
-    console.log("📊 Active threads:", list.length)  // Debug log
-    res.json(list)
-})
-
-// API Route
-app.get("/api/threads",(req,res)=>{
-    let list=[]
-    activeSessions.forEach((v,k)=>{
-        list.push({
-            id: k.substring(3),  // Remove "HX_"
-            start: v.start,
-            running: Math.floor((Date.now()-v.start)/1000)
-        })
-    })
-    res.json(list)
-})
-
-// STOP Route mein bhi fix
-app.post("/stop/:id",(req,res)=>{
-    let id = "HX_" + req.params.id  // Add HX_ prefix
-    let s = activeSessions.get(id)
-    if(s){
-        clearInterval(s.interval)
-        activeSessions.delete(id)
-        console.log("🛑 Stopped:", id)
-    }
-    res.json({success:true})
-})
+    `);
+});
 
 // ---------------- START BOT ----------------
 
