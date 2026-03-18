@@ -599,7 +599,7 @@ html+= \`
 </div>
 <div class="buttons">
 <button class="btn btn-logs" onclick="viewLogs('\${t.id}')">View Logs</button>
-<button class="btn btn-stop" onclick="stopThread('\${t.id}')">STOP THREAD</button>
+<button class="btn btn-stop" onclick="stopThread('\${t.id}')">STOP</button>
 </div>
 </div>
 \`
@@ -611,10 +611,8 @@ document.getElementById("threads").innerHTML=html
 }
 
 function stopThread(id){
-if(confirm("🛑 Stop this thread?")){
-fetch("/stop/"+id,{method:"POST"})
-.then(()=>load())
-}
+    fetch("/stop/HX_"+id,{method:"POST"})  // Add HX_ prefix
+    .then(()=>load())
 }
 
 function viewLogs(id){
@@ -634,26 +632,46 @@ load()
 })
 // ---------------- THREAD API ----------------
 
+// /api/threads route ko exactly YEH replace kar:
+
+app.get("/api/threads", (req, res) => {
+    let list = []
+    activeSessions.forEach((session, id) => {
+        if (session && session.interval) {  // Check if still active
+            list.push({
+                id: id.replace("HX_", ""),  // Clean ID
+                start: session.start,
+                running: Math.floor((Date.now() - session.start) / 1000)
+            })
+        }
+    })
+    console.log("📊 Active threads:", list.length)  // Debug log
+    res.json(list)
+})
+
+// API Route
 app.get("/api/threads",(req,res)=>{
-
-let list=[]
-
-activeSessions.forEach((v,k)=>{
-
-list.push({
-
-id:k,
-
-start:new Date(v.start).toLocaleTimeString(),
-
-running:Math.floor((Date.now()-v.start)/1000)
-
+    let list=[]
+    activeSessions.forEach((v,k)=>{
+        list.push({
+            id: k.substring(3),  // Remove "HX_"
+            start: v.start,
+            running: Math.floor((Date.now()-v.start)/1000)
+        })
+    })
+    res.json(list)
 })
 
-})
-
-res.json(list)
-
+// STOP Route mein bhi fix
+app.post("/stop/:id",(req,res)=>{
+    let id = "HX_" + req.params.id  // Add HX_ prefix
+    let s = activeSessions.get(id)
+    if(s){
+        clearInterval(s.interval)
+        activeSessions.delete(id)
+        console.log("🛑 Stopped:", id)
+    }
+    res.json({success:true})
 })
 
 // ---------------- START BOT ----------------
