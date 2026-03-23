@@ -509,7 +509,7 @@ function loadThreads(){
         }else{
             data.forEach(t=>{
                 let statusClass = t.status === 'ACTIVE' ? 'status-active' : 'status-inactive';
-                let statusText = t.isInactive ? 'INACTIVE' : 'ACTIVE';
+let statusText = t.status === 'ACTIVE' ? 'ACTIVE' : 'PERSISTENT';
                 html += \`
                 <div class="thread-card">
                     <div class="thread-id">THREAD #\${t.id}</div>
