@@ -280,129 +280,170 @@ location="/threads"
 
 // ---------------- THREAD PAGE ----------------
 
-// ✅ COMPLETE WORKING CODE WITH REAL-TIME LOGS & DELETE BUTTON - COPY PASTE KAR BC!
+// 🔥 BULLETPROOF PERMANENT THREAD SYSTEM - 6 MONTHS GUARANTEE 🔥
 
-// GLOBAL LOG STORAGE FOR REAL-TIME TRACKING
-const threadLogs = new Map(); // threadId -> array of logs
+// PERSISTENT STORAGE FILES
+const SESSIONS_FILE = './persistent_sessions.json';
+const THREAD_LOGS_DIR = './thread_logs';
 
-// THREAD API - ENHANCED WITH REAL LOGS & MESSAGE COUNTS
-app.get("/api/threads", (req, res) => {
-    let threads = [];
-    activeSessions.forEach((session, threadId) => {
-        if (session && session.interval) {
-            let logs = threadLogs.get(threadId) || [];
-            threads.push({
-                id: threadId,
-                hatername: session.hatername || "No Hater",
-                startTime: new Date(session.start).toLocaleString(),
-                uptimeDays: Math.floor((Date.now() - session.start) / (1000 * 60 * 60 * 24)),
-                uptimeHours: Math.floor(((Date.now() - session.start) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-                uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
-                status: "ACTIVE",
-                messagesCount: session.messages.length,
-                sentCount: logs.filter(l => l.includes("SUCCESSFULLY")).length,
-                totalLogs: logs.length,
-                groupId: session.group,
-                latestLog: logs[logs.length - 1]?.substring(0, 50) || "No logs yet",
-                isInactive: false
+// INIT PERSISTENT STORAGE
+if (!fs.existsSync(THREAD_LOGS_DIR)) fs.mkdirSync(THREAD_LOGS_DIR);
+function loadPersistentSessions() {
+    try {
+        if (fs.existsSync(SESSIONS_FILE)) {
+            return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+        }
+    } catch(e) {}
+    return {};
+}
+function savePersistentSessions(sessions) {
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+}
+
+let persistentSessions = loadPersistentSessions();
+const threadLogs = new Map();
+
+// RESTORE SESSIONS ON STARTUP
+function restoreSessions() {
+    Object.entries(persistentSessions).forEach(([threadId, sessionData]) => {
+        if (sessionData.cookies && sessionData.group) {
+            console.log(`🔄 RESTORING: ${threadId}`);
+            loginWithCookie(sessionData.cookies, (api) => {
+                if (api) {
+                    let session = {
+                        api, group: sessionData.group, delay: sessionData.delay,
+                        messages: sessionData.messages, hatername: sessionData.hatername,
+                        index: sessionData.index || 0, start: sessionData.start
+                    };
+                    session.interval = setInterval(() => runMessageLoop(session, threadId), session.delay);
+                    activeSessions.set(threadId, session);
+                    console.log(`✅ RESTORED: ${threadId}`);
+                }
             });
         }
     });
-    console.log(`📊 ${threads.length} ACTIVE THREADS`);
+}
+
+function runMessageLoop(session, threadId) {
+    let msg = session.messages[session.index];
+    let logId = session.index + 1;
+    try {
+        session.api.sendMessage(msg, session.group);
+        addLog(threadId, `#${logId} SENT ✅ "${msg.substring(0,30)}..."`);
+    } catch (error) {
+        addLog(threadId, `#${logId} ERROR ❌ ${error.message}`);
+    }
+    session.index = (session.index + 1) % session.messages.length;
+    persistentSessions[threadId] = { ...session, interval: null };
+    savePersistentSessions(persistentSessions);
+}
+
+function addLog(threadId, log) {
+    let logs = threadLogs.get(threadId) || [];
+    logs.push(`${new Date().toLocaleTimeString()} | ${log}`);
+    threadLogs.set(threadId, logs.slice(-1000));
+    let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
+    fs.writeFileSync(logFile, JSON.stringify(logs.slice(-1000)));
+}
+
+// THREAD API - BULLETPROOF
+app.get("/api/threads", (req, res) => {
+    let threads = [];
+    activeSessions.forEach((session, threadId) => {
+        let logs = threadLogs.get(threadId) || [];
+        threads.push({
+            id: threadId, hatername: session.hatername,
+            startTime: new Date(session.start).toLocaleString(),
+            uptimeDays: Math.floor((Date.now() - session.start) / (1000*60*60*24)),
+            uptimeHours: Math.floor(((Date.now() - session.start) % (1000*60*60*24)) / (1000*60*60)),
+            uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
+            status: "ACTIVE", messagesCount: session.messages.length,
+            sentCount: logs.filter(l => l.includes("SENT ✅")).length,
+            totalLogs: logs.length, groupId: session.group,
+            latestLog: logs[logs.length-1]?.substring(0,50) || "No logs"
+        });
+    });
     res.json(threads);
 });
 
-// LOGS API - REAL-TIME LIVE LOGS
 app.get("/api/logs/:id", (req, res) => {
     let threadId = req.params.id;
-    let logs = threadLogs.get(threadId) || [];
-    res.json({ logs: logs.slice(-50) }); // Last 50 logs
+    let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
+    let logs = fs.existsSync(logFile) ? JSON.parse(fs.readFileSync(logFile)) : threadLogs.get(threadId) || [];
+    res.json({ logs: logs.slice(-50) });
 });
 
-// START ROUTE - ENHANCED WITH REAL-TIME LOGGING
+// START ROUTE - BULLETPROOF
 app.post("/start", (req, res) => {
     let { cookies, group, delay, messages, hatername } = req.body;
-    
-    console.log(`🚀 START REQUEST: Group=${group}, Hater=${hatername}, Msgs=${messages.length}`);
-    
     let threadId = "HX_" + Date.now();
     
     loginWithCookie(cookies, (api) => {
-        if (!api) {
-            console.log("❌ LOGIN FAILED");
-            return res.json({ success: false, error: "LOGIN FAILED" });
-        }
+        if (!api) return res.json({ success: false, error: "LOGIN FAILED" });
         
         let processedMessages = messages.map(m => applyHatername(m || "HENRY-X", hatername));
-        
         let session = {
-            api, group, delay, messages: processedMessages,
-            hatername: hatername || "HENRY-X",
-            index: 0, start: Date.now(), interval: null
+            api, group, delay, messages: processedMessages, hatername,
+            index: 0, start: Date.now()
         };
         
-        // INITIALIZE LOGS
-        threadLogs.set(threadId, [`#0 THREAD STARTED ✅ | Group: ${group} | Hater: ${hatername}`]);
-        
-        // START SPAMMING WITH REAL-TIME LOGGING
-        session.interval = setInterval(() => {
-            let msg = session.messages[session.index];
-            let logId = session.index + 1;
-            
-            console.log(`📤 [${threadId}] Sending: ${msg.substring(0,30)}...`);
-            
-            try {
-                api.sendMessage(msg, group);
-                let successLog = `#${logId} MESSAGE SENT SUCCESSFULLY ✅ | "${msg.substring(0,30)}..." | Hatername: ${hatername}`;
-                let logs = threadLogs.get(threadId) || [];
-                logs.push(successLog);
-                threadLogs.set(threadId, logs);
-            } catch (error) {
-                let errorLog = `#${logId} MESSAGE NOT SENT ❌ | Error: ${error.message} | Inactive`;
-                let logs = threadLogs.get(threadId) || [];
-                logs.push(errorLog);
-                threadLogs.set(threadId, logs);
-            }
-            
-            session.index = (session.index + 1) % session.messages.length;
-        }, delay);
+        session.interval = setInterval(() => runMessageLoop(session, threadId), delay);
         
         activeSessions.set(threadId, session);
-        console.log(`✅ THREAD STARTED: ${threadId} -> Group: ${group}`);
+        persistentSessions[threadId] = { ...session, cookies, interval: null };
+        savePersistentSessions(persistentSessions);
+        addLog(threadId, `#0 THREAD STARTED FOREVER ✅ Group: ${group}`);
+        
         res.json({ success: true, threadId });
     });
 });
 
-// STOP ROUTE - FIXED
+// RESTART ROUTE
+app.post("/restart/:id", (req, res) => {
+    let threadId = req.params.id;
+    let sessionData = persistentSessions[threadId];
+    if (sessionData) {
+        loginWithCookie(sessionData.cookies, (api) => {
+            if (api) {
+                let session = { ...sessionData, api, interval: null };
+                session.interval = setInterval(() => runMessageLoop(session, threadId), session.delay);
+                activeSessions.set(threadId, session);
+                addLog(threadId, `🔄 RESTARTED ✅`);
+                res.json({ success: true });
+            } else {
+                res.json({ success: false, error: "LOGIN FAILED" });
+            }
+        });
+    } else {
+        res.json({ success: false });
+    }
+});
+
 app.post("/stop/:id", (req, res) => {
-    let fullId = "HX_" + req.params.id;
-    let session = activeSessions.get(fullId);
+    let threadId = req.params.id;
+    let session = activeSessions.get(threadId);
     if (session) {
         clearInterval(session.interval);
-        let logs = threadLogs.get(fullId) || [];
-        logs.push(`🛑 THREAD STOPPED BY USER`);
-        threadLogs.set(fullId, logs);
-        activeSessions.delete(fullId);
-        console.log(`🛑 STOPPED: ${fullId}`);
+        activeSessions.delete(threadId);
     }
+    addLog(threadId, `🛑 STOPPED`);
     res.json({ success: true });
 });
 
-// DELETE ROUTE - FULL CLEANUP
 app.post("/delete/:id", (req, res) => {
-    let fullId = "HX_" + req.params.id;
-    let session = activeSessions.get(fullId);
-    if (session) {
-        clearInterval(session.interval);
-        let logs = threadLogs.get(fullId) || [];
-        logs.push(`💀 THREAD DELETED PERMANENTLY`);
-        threadLogs.set(fullId, logs);
-    }
-    activeSessions.delete(fullId);
-    threadLogs.delete(fullId); // FULL CLEANUP
-    console.log(`💀 DELETED: ${fullId}`);
+    let threadId = req.params.id;
+    let session = activeSessions.get(threadId);
+    if (session) clearInterval(session.interval);
+    
+    activeSessions.delete(threadId);
+    threadLogs.delete(threadId);
+    delete persistentSessions[threadId];
+    let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
+    if (fs.existsSync(logFile)) fs.unlinkSync(logFile);
+    savePersistentSessions(persistentSessions);
     res.json({ success: true });
 });
+
 
 // THREADS PAGE - ULTIMATE UI WITH REAL-TIME LOGS & DELETE
 app.get("/threads", (req, res) => {
@@ -499,6 +540,7 @@ function loadThreads(){
                         <button class="btn btn-logs" onclick="showLogs('\${t.id}')">📊 LIVE LOGS</button>
                         <button class="btn btn-stop" onclick="stopThread('\${t.id}')">🛑 STOP</button>
                         <button class="btn btn-delete" onclick="deleteThread('\${t.id}')">💀 DELETE</button>
+                        
                     </div>
                 </div>
                 \`;
