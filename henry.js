@@ -537,10 +537,11 @@ function loadThreads(){
                     </div>
                     <div class="latest-log">Latest: \${t.latestLog}</div>
                     <div class="buttons">
-                        <button class="btn btn-logs" onclick="showLogs('\${t.id}')">📊 LIVE LOGS</button>
-                        <button class="btn btn-stop" onclick="stopThread('\${t.id}')">🛑 STOP</button>
-                        <button class="btn btn-delete" onclick="deleteThread('\${t.id}')">💀 DELETE</button>
-                        
+    <button class="btn btn-logs" onclick="showLogs('${t.id}')">📊 LIVE LOGS</button>
+    <button class="btn" style="background:linear-gradient(45deg,#ffaa00,#ff8800);color:white;" onclick="restartThread('${t.id}')">🔄 RESTART</button>
+    <button class="btn btn-stop" onclick="stopThread('${t.id}')">🛑 STOP</button>
+    <button class="btn btn-delete" onclick="deleteThread('${t.id}')">💀 DELETE</button>
+    
                     </div>
                 </div>
                 \`;
@@ -582,6 +583,18 @@ function stopThread(id){
 function deleteThread(id){
     if(confirm('💀 DELETE THREAD #' + id + '? (Stops + Removes everything)')){
         fetch('/delete/' + id, {method:'POST'}).then(loadThreads);
+    }
+}
+
+function restartThread(id){
+    if(confirm('🔄 RESTART THREAD #' + id + '?')){
+        fetch('/restart/' + id, {method:'POST'})
+        .then(r=>r.json())
+        .then(data=>{
+            if(data.success) alert('✅ RESTARTED!');
+            else alert('❌ ' + (data.error || 'Failed'));
+            loadThreads();
+        });
     }
 }
 
@@ -673,6 +686,9 @@ activeSessions.delete(id)
 res.json({success:true})
 
 })
+
+restoreSessions();
+setInterval(() => savePersistentSessions(persistentSessions), 30000);
 
 // ---------------- START SERVER ----------------
 
