@@ -476,14 +476,27 @@ app.post("/delete/:id", (req, res) => {
 });
 
 
-// THREADS PAGE - ULTIMATE UI WITH REAL-TIME LOGS & DELETE
+
+<div id="logModal" class="log-modal">
+    <div class="log-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h2 id="logTitle" style="margin:0;color:#00ff88;">LIVE LOGS</h2>
+            <button class="close-btn" onclick="closeLogs()">CLOSE</button>
+        </div>
+        <div id="logLines" class="log-lines"></div>
+    </div>
+</div>
+
+
+// THREAD HTML
+
 app.get("/threads", (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>THREAD'X MANAGER - LIVE LOGS</title>
+<title>THREAD\\'X MANAGER - LIVE LOGS</title>
 <style>
 body{background:linear-gradient(135deg,#0a1f44,#2b6cb0);font-family:Arial;color:white;padding:20px;}
 .title{font-size:3rem;font-weight:bold;background:linear-gradient(45deg,#00ff88,#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin:20px 0;}
@@ -513,12 +526,10 @@ body{background:linear-gradient(135deg,#0a1f44,#2b6cb0);font-family:Arial;color:
 </style>
 </head>
 <body>
-<h1 class="title">THREAD'X LIVE MANAGER</h1>
+<h1 class="title">THREAD\\'X LIVE MANAGER</h1>
 <img src="https://raw.githubusercontent.com/yuvi-x-henry/Pf/refs/heads/main/e632c4ddfeae7def55bc5f43688e8cf4.jpg" class="image">
 <div id="threads"></div>
-
-<!-- LIVE LOGS MODAL -->
-<div id="logModal" class="log-modal">
+<div id="logModal" class="log-modal" style="display:none;">
     <div class="log-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
             <h2 id="logTitle" style="margin:0;color:#00ff88;">LIVE LOGS</h2>
@@ -527,116 +538,16 @@ body{background:linear-gradient(135deg,#0a1f44,#2b6cb0);font-family:Arial;color:
         <div id="logLines" class="log-lines"></div>
     </div>
 </div>
-
-
 <script>
-let currentThreadId = null;
-function loadThreads(){
-    fetch('/api/threads')
-    .then(r=>r.json())
-    .then(data=>{
-        let html = '';
-        if(data.length === 0){
-            html = '<div class="no-threads"><h2>🚀 No Active Threads</h2><p>Start from main panel</p></div>';
-        }else{
-            data.forEach(t=>{
-                let statusClass = t.status === 'ACTIVE' ? 'status-active' : 'status-inactive';
-                let statusText = t.status === 'ACTIVE' ? 'ACTIVE' : 'PERSISTENT';  // ✅ FIXED
-                html += `
-                <div class="thread-card">
-                    <div class="thread-id">THREAD #${t.id}</div>
-                    <div class="status ${statusClass}">${statusText}</div>
-                    <div>Hatername: <b>${t.hatername}</b></div>
-                    <div class="stats-row">
-                        <div class="stat-box">
-                            <div style="font-size:20px;color:#00ff88">${t.sentCount}</div>
-                            <div>SENT</div>
-                        </div>
-                        <div class="stat-box">
-                            <div style="font-size:20px;color:#7b2ff7">${t.totalLogs}</div>
-                            <div>TOTAL</div>
-                        </div>
-                        <div class="stat-box">
-                            <div style="font-size:20px">${t.uptimeDays}d ${t.uptimeHours}h</div>
-                            <div>UPTIME</div>
-                        </div>
-                    </div>
-                    <div class="details">
-                        <div class="detail">Started: ${t.startTime}</div>
-                        <div class="detail">Messages: ${t.messagesCount}</div>
-                        <div class="detail">Group: ${t.groupId}</div>
-                        <div class="detail">Uptime: ${t.uptimeSeconds}s</div>
-                    </div>
-                    <div class="latest-log">Latest: ${t.latestLog}</div>
-                    <div class="buttons">
-                        <button class="btn btn-logs" onclick="showLogs('${t.id}')">📊 LIVE LOGS</button>
-                        <button class="btn" style="background:linear-gradient(45deg,#ffaa00,#ff8800);color:white;" onclick="restartThread('${t.id}')">🔄 RESTART</button>
-                        <button class="btn btn-stop" onclick="stopThread('${t.id}')">🛑 STOP</button>
-                        <button class="btn btn-delete" onclick="deleteThread('${t.id}')">💀 DELETE</button>
-                    </div>
-                </div>
-                `;
-            });
-        }
-        document.getElementById('threads').innerHTML = html;
-    });
-}
-
-function showLogs(id){
-    currentThreadId = id;
-    document.getElementById('logTitle').textContent = 'LIVE LOGS - THREAD #' + id;
-    document.getElementById('logModal').style.display = 'block';
-    loadLiveLogs();
-}
-
-function loadLiveLogs(){
-    if(!currentThreadId) return;
-    fetch('/api/logs/' + currentThreadId)
-    .then(r=>r.json())
-    .then(data=>{
-        let html = '';
-        data.logs.forEach(log=>{
-            let className = log.includes('SENT') ? 'log-line-success' : 
-                           log.includes('ERROR') ? 'log-line-error' : '';
-            html += '<div class="' + className + '">' + log + '</div>';
-        });
-        document.getElementById('logLines').innerHTML = html;
-        document.getElementById('logLines').scrollTop = document.getElementById('logLines').scrollHeight;
-    });
-}
-
-function restartThread(id){
-    if(confirm('🔄 RESTART THREAD #' + id + '?')){
-        fetch('/restart/' + id, {method:'POST'})
-        .then(r=>r.json())
-        .then(data=>{
-            if(data.success) alert('✅ RESTARTED!');
-            else alert('❌ Failed to restart');
-            loadThreads();
-        });
-    }
-}
-
-function stopThread(id){
-    if(confirm('🛑 Stop THREAD #' + id + '?')){
-        fetch('/stop/' + id, {method:'POST'}).then(loadThreads);
-    }
-}
-
-function deleteThread(id){
-    if(confirm('💀 DELETE THREAD #' + id + '?')){
-        fetch('/delete/' + id, {method:'POST'}).then(loadThreads);
-    }
-}
-
-function closeLogs(){
-    document.getElementById('logModal').style.display = 'none';
-    currentThreadId = null;
-}
-
-setInterval(loadThreads, 2000);
-setInterval(()=>{if(currentThreadId) loadLiveLogs();}, 1000);
-loadThreads();
+let currentThreadId=null;
+function loadThreads(){fetch(\'/api/threads\').then(r=>r.json()).then(data=>{let html=\'\';if(data.length===0){html=\'<div class="no-threads"><h2>🚀 No Active Threads</h2><p>Start from main panel</p></div>\';}else{data.forEach(t=>{let statusClass=t.status===\'ACTIVE\'?\'status-active\':\'status-inactive\';let statusText=t.status===\'ACTIVE\'?\'ACTIVE\':\'PERSISTENT\';html+=`<div class="thread-card"><div class="thread-id">THREAD #${t.id}</div><div class="status ${statusClass}">${statusText}</div><div>Hatername: <b>${t.hatername}</b></div><div class="stats-row"><div class="stat-box"><div style="font-size:20px;color:#00ff88">${t.sentCount}</div><div>SENT</div></div><div class="stat-box"><div style="font-size:20px;color:#7b2ff7">${t.totalLogs}</div><div>TOTAL</div></div><div class="stat-box"><div style="font-size:20px">${t.uptimeDays}d ${t.uptimeHours}h</div><div>UPTIME</div></div></div><div class="details"><div class="detail">Started: ${t.startTime}</div><div class="detail">Messages: ${t.messagesCount}</div><div class="detail">Group: ${t.groupId}</div><div class="detail">Uptime: ${t.uptimeSeconds}s</div></div><div class="latest-log">Latest: ${t.latestLog}</div><div class="buttons"><button class="btn btn-logs" onclick="showLogs(\\'${t.id}\\')">📊 LIVE LOGS</button><button class="btn" style="background:linear-gradient(45deg,#ffaa00,#ff8800);color:white;" onclick="restartThread(\\'${t.id}\\')">🔄 RESTART</button><button class="btn btn-stop" onclick="stopThread(\\'${t.id}\\')">🛑 STOP</button><button class="btn btn-delete" onclick="deleteThread(\\'${t.id}\\')">💀 DELETE</button></div></div>`;});}document.getElementById(\'threads\').innerHTML=html;});}
+function showLogs(id){currentThreadId=id;document.getElementById(\'logTitle\').textContent=\'LIVE LOGS - THREAD #\'+id;document.getElementById(\'logModal\').style.display=\'block\';loadLiveLogs();}
+function loadLiveLogs(){if(!currentThreadId)return;fetch(\'/api/logs/\'+currentThreadId).then(r=>r.json()).then(data=>{let html=\'\';data.logs.forEach(log=>{let className=log.includes(\'SENT\')?\'log-line-success\':log.includes(\'ERROR\')?\'log-line-error\':\'\';html+=\'<div class="\'+className+\'">\'+log+\'</div>\';});document.getElementById(\'logLines\').innerHTML=html;document.getElementById(\'logLines\').scrollTop=document.getElementById(\'logLines\').scrollHeight;});}
+function restartThread(id){if(confirm(\'🔄 RESTART THREAD #\'+id+\'?\' )){fetch(\'/restart/\'+id,{method:\'POST\'}).then(r=>r.json()).then(data=>{if(data.success)alert(\'✅ RESTARTED!\');else alert(\'❌ Failed\');loadThreads();});}}
+function stopThread(id){if(confirm(\'🛑 Stop THREAD #\'+id+\'?\' )){fetch(\'/stop/\'+id,{method:\'POST\'}).then(loadThreads);}}
+function deleteThread(id){if(confirm(\'💀 DELETE THREAD #\'+id+\'?\' )){fetch(\'/delete/\'+id,{method:\'POST\'}).then(loadThreads);}}
+function closeLogs(){document.getElementById(\'logModal\').style.display=\'none\';currentThreadId=null;}
+setInterval(loadThreads,2000);setInterval(()=>{if(currentThreadId)loadLiveLogs();},1000);loadThreads();
 </script>
 </body>
 </html>
