@@ -280,14 +280,12 @@ location="/threads"
 
 // ---------------- THREAD PAGE ----------------
 
-// 🔥 BULLETPROOF PERMANENT THREAD SYSTEM - 6 MONTHS GUARANTEE 🔥
-
-// PERSISTENT STORAGE FILES
+// 🔥 BULLETPROOF v2 - ERROR-PROOF 🔥
 const SESSIONS_FILE = './persistent_sessions.json';
 const THREAD_LOGS_DIR = './thread_logs';
 
-// INIT PERSISTENT STORAGE
 if (!fs.existsSync(THREAD_LOGS_DIR)) fs.mkdirSync(THREAD_LOGS_DIR);
+
 function loadPersistentSessions() {
     try {
         if (fs.existsSync(SESSIONS_FILE)) {
@@ -296,24 +294,25 @@ function loadPersistentSessions() {
     } catch(e) {}
     return {};
 }
+
 function savePersistentSessions(sessions) {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+    try {
+        fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+    } catch(e) {}
 }
 
 let persistentSessions = loadPersistentSessions();
 const threadLogs = new Map();
 
-// RESTORE SESSIONS ON STARTUP
 function restoreSessions() {
     Object.entries(persistentSessions).forEach(([threadId, sessionData]) => {
         if (sessionData.cookies && sessionData.group) {
-            console.log(`🔄 RESTORING: ${threadId}`);
             loginWithCookie(sessionData.cookies, (api) => {
                 if (api) {
                     let session = {
-                        api, group: sessionData.group, delay: sessionData.delay,
+                        api, group: sessionData.group, delay: sessionData.delay || 10000,
                         messages: sessionData.messages, hatername: sessionData.hatername,
-                        index: sessionData.index || 0, start: sessionData.start
+                        index: sessionData.index || 0, start: sessionData.start || Date.now()
                     };
                     session.interval = setInterval(() => runMessageLoop(session, threadId), session.delay);
                     activeSessions.set(threadId, session);
@@ -325,16 +324,26 @@ function restoreSessions() {
 }
 
 function runMessageLoop(session, threadId) {
+    if (!session || !session.messages || session.index === undefined) return;
+    
     let msg = session.messages[session.index];
     let logId = session.index + 1;
+    
     try {
+        if (!session.api || typeof session.api.sendMessage !== 'function') {
+            addLog(threadId, `#${logId} API DEAD ❌ RESTART NEEDED`);
+            return;
+        }
         session.api.sendMessage(msg, session.group);
         addLog(threadId, `#${logId} SENT ✅ "${msg.substring(0,30)}..."`);
     } catch (error) {
         addLog(threadId, `#${logId} ERROR ❌ ${error.message}`);
     }
+    
     session.index = (session.index + 1) % session.messages.length;
-    persistentSessions[threadId] = { ...session, interval: null };
+    persistentSessions[threadId] = { 
+        ...session, interval: null, cookies: persistentSessions[threadId]?.cookies 
+    };
     savePersistentSessions(persistentSessions);
 }
 
@@ -342,36 +351,58 @@ function addLog(threadId, log) {
     let logs = threadLogs.get(threadId) || [];
     logs.push(`${new Date().toLocaleTimeString()} | ${log}`);
     threadLogs.set(threadId, logs.slice(-1000));
-    let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
-    fs.writeFileSync(logFile, JSON.stringify(logs.slice(-1000)));
+    
+    try {
+        let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
+        fs.writeFileSync(logFile, JSON.stringify(logs.slice(-1000)));
+    } catch(e) {}
 }
 
-// THREAD API - BULLETPROOF
+// APIs WITH ERROR HANDLING
 app.get("/api/threads", (req, res) => {
-    let threads = [];
-    activeSessions.forEach((session, threadId) => {
-        let logs = threadLogs.get(threadId) || [];
-        threads.push({
-            id: threadId, hatername: session.hatername,
-            startTime: new Date(session.start).toLocaleString(),
-            uptimeDays: Math.floor((Date.now() - session.start) / (1000*60*60*24)),
-            uptimeHours: Math.floor(((Date.now() - session.start) % (1000*60*60*24)) / (1000*60*60)),
-            uptimeSeconds: Math.floor((Date.now() - session.start) / 1000),
-            status: "ACTIVE", messagesCount: session.messages.length,
-            sentCount: logs.filter(l => l.includes("SENT ✅")).length,
-            totalLogs: logs.length, groupId: session.group,
-            latestLog: logs[logs.length-1]?.substring(0,50) || "No logs"
+    try {
+        let threads = [];
+        activeSessions.forEach((session, threadId) => {
+            if (session) {
+                let logs = threadLogs.get(threadId) || [];
+                threads.push({
+                    id: threadId, hatername: session.hatername || "Unknown",
+                    startTime: new Date(session.start || Date.now()).toLocaleString(),
+                    uptimeDays: Math.floor((Date.now() - (session.start || Date.now())) / (1000*60*60*24)),
+                    uptimeHours: Math.floor(((Date.now() - (session.start || Date.now())) % (1000*60*60*24)) / (1000*60*60)),
+                    uptimeSeconds: Math.floor((Date.now() - (session.start || Date.now())) / 1000),
+                    status: session.interval ? "ACTIVE" : "STOPPED",
+                    messagesCount: session.messages?.length || 0,
+                    sentCount: logs.filter(l => l.includes("SENT ✅")).length,
+                    totalLogs: logs.length, 
+                    groupId: session.group || "Unknown",
+                    latestLog: logs[logs.length-1]?.substring(0,50) || "No logs"
+                });
+            }
         });
-    });
-    res.json(threads);
+        res.json(threads);
+    } catch(e) {
+        res.json([]);
+    }
 });
 
 app.get("/api/logs/:id", (req, res) => {
-    let threadId = req.params.id;
-    let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
-    let logs = fs.existsSync(logFile) ? JSON.parse(fs.readFileSync(logFile)) : threadLogs.get(threadId) || [];
-    res.json({ logs: logs.slice(-50) });
+    try {
+        let threadId = req.params.id;
+        let logFile = path.join(THREAD_LOGS_DIR, `${threadId}.json`);
+        let logs = [];
+        if (fs.existsSync(logFile)) {
+            logs = JSON.parse(fs.readFileSync(logFile));
+        } else {
+            logs = threadLogs.get(threadId) || [];
+        }
+        res.json({ logs: logs.slice(-50) });
+    } catch(e) {
+        res.json({ logs: [] });
+    }
 });
+
+// [BAKI ROUTES SAME - /start, /restart, /stop, /delete WALE SAME RAHO]
 
 // START ROUTE - BULLETPROOF
 app.post("/start", (req, res) => {
